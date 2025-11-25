@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "buildCommand": "cd BACKEND && npm install && npx prisma generate",
+  "rewrites": [
+    { "source": "/api/auth/(.*)", "destination": "/BACKEND/src/services/auth-service/server.js" },
+    { "source": "/api/courses/(.*)", "destination": "/BACKEND/src/services/course-service/server.js" },
+    { "source": "/api/schedules/(.*)", "destination": "/BACKEND/src/services/schedule-service/server.js" },
+    { "source": "/api/venues/(.*)", "destination": "/BACKEND/src/services/venue-service/server.js" },
+    { "source": "/api/announcements/(.*)", "destination": "/BACKEND/src/services/announcement-service/server.js" },
+    { "source": "/api/users/(.*)", "destination": "/BACKEND/src/services/user-service/server.js" }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "BACKEND/src/services/**/server.js": {
+      "maxDuration": 10
+    }
+  }
+}
