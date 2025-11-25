@@ -924,18 +924,9 @@ app.use((req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
-// Start server
-const PORT = process.env.PORT || 3000;
-
-server.listen(PORT, () => {
-  console.log('\n=================================');
-  console.log(' Server is running');
-  console.log(` Port: ${PORT}`);
-  console.log(` Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(` API Docs: http://localhost:${PORT}/api-docs`);
-  console.log(` Socket.IO: Enabled`);
-  console.log('=================================\n');
-});
+// Server startup will be handled by server.js
+// Export PORT for server.js to use
+const PORT = process.env.PORT || 5000;
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
@@ -949,4 +940,4 @@ process.on('unhandledRejection', (err) => {
   server.close(() => process.exit(1));
 });
 
-module.exports = { app, server };
+module.exports = { app, server, PORT };

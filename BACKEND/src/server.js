@@ -1,7 +1,5 @@
 require('dotenv').config();
-const { app, server } = require('./app');
-
-const PORT = process.env.PORT || 5000;
+const { app, server, PORT } = require('./app');
 
 // Trust proxy headers in production (required for Render and other platforms)
 if (process.env.NODE_ENV === 'production') {
@@ -19,19 +17,4 @@ server.listen(PORT, () => {
   console.log('=================================\n');
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-});
+// Graceful shutdown handlers are already in app.js
