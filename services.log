@@ -1,0 +1,119 @@
+[34mStarting Smart University Microservices...[0m
+=====================================
+[34mAll services started![0m
+=====================================
+[34mAPI Gateway: http://localhost:3000[0m
+[34mAuth Service: http://localhost:3001[0m
+[34mCourse Service: http://localhost:3003[0m
+[34mNotification Service: http://localhost:3004[0m
+[34mSchedule Service: http://localhost:3005[0m
+[34mVenue Service: http://localhost:3006[0m
+[34mAnnouncement Service: http://localhost:3007[0m
+[34mUser Service: http://localhost:3008[0m
+=====================================
+[34mPress Ctrl+C to stop all services[0m
+[36m[API Gateway]=================================
+[36m[API Gateway]API Gateway is running
+ Port: 3000
+ Environment: development
+ API Docs: http://localhost:3000/api-docs
+=================================
+[32m[Auth Service]=================================
+[32m[Auth Service]Auth Service is running
+ Port: 3001
+ Environment: development
+=================================
+[32m[User Service]=================================
+[32m[User Service]User Service is running
+ Port: 3008
+ Environment: development
+=================================
+[31m[Schedule Service]=================================
+[31m[Schedule Service]Schedule Service is running
+ Port: 3005
+ Environment: development
+[31m[Schedule Service]=================================
+[33m[Course Service]=================================
+[33m[Course Service]Course Service is running
+ Port: 3003
+ Environment: development
+=================================
+[35m[Notification Service]=================================
+[35m[Notification Service]Notification Service is running
+[35m[Notification Service]Port: 3004
+ Environment: development
+ Socket.IO: Enabled
+=================================
+[34m[Venue Service]=================================
+[36m[Announcement Service]=================================
+[34m[Venue Service]Venue Service is running
+ Port: 3006
+ Environment: development
+[36m[Announcement Service]Announcement Service is running
+ Port: 3007
+ Environment: development
+=================================
+[34m[Venue Service]=================================
+[32m[User Service]Database connected successfully
+[31m[Schedule Service]Database connected successfully
+[33m[Course Service]Database connected successfully
+[36m[Announcement Service]Database connected successfully
+[34m[Venue Service]Database connected successfully
+[36m[API Gateway]Blocked by CORS: http://localhost:3000
+[36m[API Gateway] ERROR: Error: Error: CORS policy: Origin not allowed
+    at origin (/home/cal/smart university communication and venue notification system/BACKEND/src/server.js:33:21)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:219:13
+    at optionsCallback (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:199:9)
+    at corsMiddleware (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:204:7)
+    at Layer.handle [as handle_request] (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:328:13)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:286:9
+    at router.process_params (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/middleware/init.js:40:5)
+[36m[API Gateway]Blocked by CORS: http://localhost:3000
+[36m[API Gateway] ERROR: Error: Error: CORS policy: Origin not allowed
+    at origin (/home/cal/smart university communication and venue notification system/BACKEND/src/server.js:33:21)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:219:13
+    at optionsCallback (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:199:9)
+    at corsMiddleware (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:204:7)
+    at Layer.handle [as handle_request] (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:328:13)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:286:9
+    at router.process_params (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/middleware/init.js:40:5)
+[36m[API Gateway][2025-11-19T18:37:38.562Z] POST /api/auth/login - IP: ::1
+[36m[API Gateway]Received request for: /login POST
+[32m[Auth Service][AUTH SERVICE] 2025-11-19T18:37:38.610Z POST /login
+[32m[Auth Service][Auth Service] Login request received { email: 'admin@smartuniversity.edu', password: 'Password123!' }
+[32m[Auth Service][Auth Service] Validating fields...
+[32m[Auth Service][Auth Service] Checking for user in DB...
+[32m[Auth Service][Auth Service] User found: Yes
+[32m[Auth Service][Auth Service] Comparing passwords (sync)...
+[Auth Service] Input password type: string, DB password type: string
+[32m[Auth Service][Auth Service] Password match result: true
+[Auth Service] Generating token...
+[36m[API Gateway][2025-11-19T18:38:46.301Z] GET /api/auth/me - IP: ::ffff:127.0.0.1
+[36m[API Gateway]Received request for: /me GET
+[32m[Auth Service][AUTH SERVICE] 2025-11-19T18:38:46.305Z GET /me
+[36m[API Gateway]Blocked by CORS: http://localhost:3000
+[36m[API Gateway] ERROR: Error: Error: CORS policy: Origin not allowed
+    at origin (/home/cal/smart university communication and venue notification system/BACKEND/src/server.js:33:21)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:219:13
+    at optionsCallback (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:199:9)
+    at corsMiddleware (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/cors/lib/index.js:204:7)
+    at Layer.handle [as handle_request] (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:328:13)
+    at /home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:286:9
+    at router.process_params (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/home/cal/smart university communication and venue notification system/BACKEND/node_modules/express/lib/middleware/init.js:40:5)
+[35m[Notification Service] Process exited with code null
+[36m[API Gateway] Process exited with code null
+[31m[Schedule Service] Process exited with code null
+[33m[Course Service] Process exited with code null
+[34m[Venue Service] Process exited with code null
+[36m[Announcement Service] Process exited with code null
+[32m[User Service] Process exited with code null
+[32m[Auth Service] Process exited with code null
