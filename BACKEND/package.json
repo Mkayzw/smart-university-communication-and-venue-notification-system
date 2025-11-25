@@ -1,7 +1,7 @@
 {
   "name": "smart-university-backend",
   "version": "2.0.1",
-  "description": "Smart University Communication and Lecture Venue Notification System Backend - Microservices Architecture",
+  "description": "Smart University Communication and Lecture Venue Notification System Backend - Monolithic Architecture",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -19,7 +19,7 @@
     "notification",
     "express",
     "prisma",
-    "microservices"
+    "monolithic"
   ],
   "author": "",
   "license": "ISC",
