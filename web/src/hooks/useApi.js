@@ -5,6 +5,17 @@ import { apiFetch } from '../utils/apiClient.js'
 export const useApiQuery = (path, options = {}) => {
   const { token, isAuthenticated } = useAuth()
 
+  // Handle enabled property properly - if it's a boolean, use it directly
+  // If it's a function, call it with the context
+  let enabledValue = true
+  if (typeof options.enabled === 'boolean') {
+    enabledValue = options.enabled
+  } else if (typeof options.enabled === 'function') {
+    enabledValue = options.enabled()
+  } else {
+    enabledValue = options.enabled ?? true
+  }
+
   return useQuery({
     queryKey: options.queryKey ?? ['api', path, options.params],
     queryFn: ({ signal }) =>
@@ -15,7 +26,7 @@ export const useApiQuery = (path, options = {}) => {
         token,
         signal
       }),
-    enabled: (options.enabled ?? true) && !!token && isAuthenticated,
+    enabled: enabledValue && !!token && isAuthenticated,
     ...options
   })
 }

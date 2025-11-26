@@ -211,29 +211,29 @@ const getCourse = async (req, res, next) => {
 
 // @desc    Create course
 // @route   POST /
-// @access  Private (Lecturer/Admin)
+// @access  Private (Admin only)
 const createCourse = async (req, res, next) => {
   try {
     const { code, name, description, department, credits, lecturerId } = req.body;
 
     validateRequired(['code', 'name'], req.body);
 
+    if (req.user.role !== 'ADMIN') {
+      return next(new AppError('Only admins can create courses', 403));
+    }
+
     let courseLecturerId = req.user.id;
 
-    if (req.user.role === 'ADMIN') {
-      if (lecturerId) {
-        const lecturer = await prisma.user.findFirst({
-          where: { id: lecturerId, role: { in: ['LECTURER', 'ADMIN'] } }
-        });
+    if (lecturerId) {
+      const lecturer = await prisma.user.findFirst({
+        where: { id: lecturerId, role: { in: ['LECTURER', 'ADMIN'] } }
+      });
 
-        if (!lecturer) {
-          return next(new AppError('Provided lecturer does not exist', 400));
-        }
-
-        courseLecturerId = lecturerId;
+      if (!lecturer) {
+        return next(new AppError('Provided lecturer does not exist', 400));
       }
-    } else if (req.user.role !== 'LECTURER') {
-      return next(new AppError('Only lecturers or admins can create courses', 403));
+
+      courseLecturerId = lecturerId;
     }
 
     if (credits !== undefined && (Number.isNaN(Number(credits)) || Number(credits) < 0)) {

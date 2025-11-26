@@ -19,13 +19,17 @@ export const MyCoursesPage = () => {
     return <Loader label="Loading your courses" />
   }
 
+  if (myCoursesQuery.isError) {
+    return <div>Error loading courses: {myCoursesQuery.error?.message || 'Unknown error'}</div>
+  }
+
   const coursesData = myCoursesQuery.data?.data || []
   const pagination = myCoursesQuery.data?.pagination
 
   // Transform data based on role
-  const courses = user?.role === 'STUDENT' 
-    ? coursesData.map(item => item.course)
-    : coursesData
+  // For students, the API returns course objects directly
+  // For lecturers/admins, the API also returns course objects directly
+  const courses = coursesData
 
   const subtitle = user?.role === 'LECTURER' 
     ? 'Courses you are teaching'
@@ -86,33 +90,6 @@ export const MyCoursesPage = () => {
             </div>
           )}
 
-          {/* Summary Stats */}
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border/70 bg-linear-to-br from-brand-50 to-white p-4 shadow-soft">
-              <p className="text-sm font-medium text-slate-600">
-                {user?.role === 'LECTURER' ? 'Teaching' : 'Enrolled In'}
-              </p>
-              <p className="mt-1 text-3xl font-bold text-brand-700">{pagination?.total || 0}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {pagination?.total === 1 ? 'course' : 'courses'}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-border/70 bg-linear-to-br from-blue-50 to-white p-4 shadow-soft">
-              <p className="text-sm font-medium text-slate-600">
-                {user?.role === 'LECTURER' ? 'Total Students' : 'Current Page'}
-              </p>
-              <p className="mt-1 text-3xl font-bold text-blue-700">
-                {user?.role === 'LECTURER' 
-                  ? courses.reduce((sum, c) => sum + (c._count?.enrollments || 0), 0)
-                  : courses.length
-                }
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {user?.role === 'LECTURER' ? 'enrolled' : 'on this page'}
-              </p>
-            </div>
-          </div>
         </>
       )}
     </div>

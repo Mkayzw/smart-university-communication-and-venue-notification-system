@@ -6,7 +6,7 @@ import { useAuth } from '../../hooks/useAuth.js'
 const navItems = [
   { to: '/', label: 'Overview' },
   { to: '/announcements', label: 'Announcements' },
-  { to: '/courses', label: 'All Courses' },
+  { to: '/courses', label: 'All Courses', roles: ['ADMIN'] },
   { to: '/my-courses', label: 'My Courses', roles: ['LECTURER', 'STUDENT'] },
   { to: '/my-schedule', label: 'My Schedule', roles: ['LECTURER', 'STUDENT'] },
   { to: '/schedules', label: 'All Schedules' },

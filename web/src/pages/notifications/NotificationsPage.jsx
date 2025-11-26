@@ -79,10 +79,12 @@ export const NotificationsPage = () => {
         onChange={(e) => setFilter({ ...filter, type: e.target.value })}
       >
         <option value="">All types</option>
+        <option value="SCHEDULE">Schedule Reminders</option>
         <option value="SCHEDULE_CREATED">Schedule Created</option>
         <option value="SCHEDULE_UPDATED">Schedule Updated</option>
         <option value="SCHEDULE_DELETED">Schedule Deleted</option>
-        <option value="NEW_ANNOUNCEMENT">Announcements</option>
+        <option value="NEW_ANNOUNCEMENT">New Announcements</option>
+        <option value="ANNOUNCEMENT">Announcements</option>
         <option value="SYSTEM">System</option>
       </select>
       <button

@@ -4,30 +4,35 @@
     "slug": "smart-university",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "smartuni",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.smartuniversity.app"
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.smartuniversity.app",
-      "permissions": [
-        "NOTIFICATIONS"
-      ]
+      "permissions": ["NOTIFICATIONS"]
     },
+
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
+
     "plugins": [
       [
         "expo-notifications",
@@ -37,6 +42,7 @@
       ],
       "expo-font"
     ],
+
     "extra": {
       "eas": {
         "projectId": "b2893b37-df26-4e9b-bbee-18aabdc53b95"

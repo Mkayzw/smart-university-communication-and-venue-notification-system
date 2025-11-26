@@ -24,7 +24,6 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../utils/apiClient';
-import { useAuth } from '../contexts/AuthContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -60,8 +59,8 @@ const MainTabs = () => {
           tabBarIcon: ({ color, size }) => <Feather name="home" size={size} color={color} />,
         }}
       />
-      {/* Conditional Tabs for Admin/Lecturer vs Student */}
-      {user?.role === 'ADMIN' || user?.role === 'LECTURER' ? (
+      {/* Conditional Tabs for Admin vs Student/Lecturer */}
+      {user?.role === 'ADMIN' ? (
         <Tab.Screen
           name="Manage Courses"
           component={CoursesScreen}
@@ -86,31 +85,6 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
-        name="Venues"
-        component={VenuesScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <Feather name="map-pin" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <View style={styles.iconContainer}>
-              <Feather name="bell" size={size} color={color} />
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount.toString()}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
@@ -122,66 +96,74 @@ const MainTabs = () => {
 };
 
 // This stack contains the main tabs and any screen you can navigate to from them
-const MainStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="MainTabs" component={MainTabs} />
-    <Stack.Screen 
-      name="AnnouncementDetail" 
-      component={AnnouncementDetailScreen}
-      options={{ headerShown: true, title: 'Announcement Details' }} 
-    />
-    <Stack.Screen 
-      name="Announcements"
-      component={AnnouncementsScreen}
-      options={{ headerShown: true, title: 'All Announcements' }}
-    />
-    <Stack.Screen 
-      name="CreateCourse"
-      component={CreateCourseScreen}
-      options={{ headerShown: true, title: 'Create Course' }}
-    />
-    <Stack.Screen 
-      name="EditCourse"
-      component={EditCourseScreen}
-      options={{ headerShown: true, title: 'Edit Course' }}
-    />
-    <Stack.Screen 
-      name="CreateVenue"
-      component={CreateVenueScreen}
-      options={{ headerShown: true, title: 'Create Venue' }}
-    />
-    <Stack.Screen 
-      name="EditVenue"
-      component={EditVenueScreen}
-      options={{ headerShown: true, title: 'Edit Venue' }}
-    />
-    <Stack.Screen 
-      name="CreateSchedule"
-      component={CreateScheduleScreen}
-      options={{ headerShown: true, title: 'Create Schedule' }}
-    />
-    <Stack.Screen 
-      name="EditSchedule"
-      component={EditScheduleScreen}
-      options={{ headerShown: true, title: 'Edit Schedule' }}
-    />
-    <Stack.Screen 
-      name="CreateAnnouncement"
-      component={CreateAnnouncementScreen}
-      options={{ headerShown: true, title: 'Create Announcement' }}
-    />
-    <Stack.Screen 
-      name="EditAnnouncement"
-      component={EditAnnouncementScreen}
-      options={{ headerShown: true, title: 'Edit Announcement' }}
-    />
-    <Stack.Screen 
-      name="Notifications"
-      component={NotificationsScreen}
-      options={{ headerShown: true, title: 'Notifications' }}
-    />
-  </Stack.Navigator>
-);
+const MainStack = () => {
+  const { user } = useAuth();
+  
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen
+        name="AnnouncementDetail"
+        component={AnnouncementDetailScreen}
+        options={{ headerShown: true, title: 'Announcement Details' }}
+      />
+      <Stack.Screen
+        name="Announcements"
+        component={AnnouncementsScreen}
+        options={{ headerShown: true, title: 'All Announcements' }}
+      />
+      {user?.role === 'ADMIN' && (
+        <Stack.Screen
+          name="CreateCourse"
+          component={CreateCourseScreen}
+          options={{ headerShown: true, title: 'Create Course' }}
+        />
+      )}
+      <Stack.Screen
+        name="EditCourse"
+        component={EditCourseScreen}
+        options={{ headerShown: true, title: 'Edit Course' }}
+      />
+      <Stack.Screen
+        name="CreateVenue"
+        component={CreateVenueScreen}
+        options={{ headerShown: true, title: 'Create Venue' }}
+      />
+      <Stack.Screen
+        name="EditVenue"
+        component={EditVenueScreen}
+        options={{ headerShown: true, title: 'Edit Venue' }}
+      />
+      <Stack.Screen
+        name="CreateSchedule"
+        component={CreateScheduleScreen}
+        options={{ headerShown: true, title: 'Create Schedule' }}
+      />
+      {(user?.role === 'ADMIN' || user?.role === 'LECTURER') && (
+        <Stack.Screen
+          name="EditSchedule"
+          component={EditScheduleScreen}
+          options={{ headerShown: true, title: 'Edit Schedule' }}
+        />
+      )}
+      <Stack.Screen
+        name="CreateAnnouncement"
+        component={CreateAnnouncementScreen}
+        options={{ headerShown: true, title: 'Create Announcement' }}
+      />
+      <Stack.Screen
+        name="EditAnnouncement"
+        component={EditAnnouncementScreen}
+        options={{ headerShown: true, title: 'Edit Announcement' }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ headerShown: true, title: 'Notifications' }}
+      />
+    </Stack.Navigator>
+  );
+};
 
 // This is the root navigator that decides whether to show Login or the Main App
 const AppNavigator = () => {

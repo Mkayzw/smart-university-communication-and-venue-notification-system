@@ -29,6 +29,12 @@ export const getErrorMessage = (error) => {
         return error.message || 'Invalid request. Please check your input.'
         
       case 401:
+        if (error.message?.toLowerCase().includes('incorrect password')) {
+          return 'Incorrect password. Please check your password and try again.'
+        }
+        if (error.message?.toLowerCase().includes('no account found')) {
+          return 'No account found with this email address.'
+        }
         if (error.message?.toLowerCase().includes('invalid credentials')) {
           return 'Wrong email or password. Please try again.'
         }
@@ -137,8 +143,8 @@ export const getFieldError = (error, fieldName) => {
     if (message.includes('invalid')) {
       return 'Please enter a valid email address'
     }
-    if (message.includes('not found')) {
-      return 'No account found with this email'
+    if (message.includes('not found') || message.includes('no account found')) {
+      return 'No account found with this email address'
     }
   }
   
@@ -146,7 +152,7 @@ export const getFieldError = (error, fieldName) => {
     if (message.includes('must be at least')) {
       return 'Password must be at least 8 characters'
     }
-    if (message.includes('invalid') || message.includes('wrong')) {
+    if (message.includes('incorrect') || message.includes('invalid') || message.includes('wrong')) {
       return 'Incorrect password'
     }
   }

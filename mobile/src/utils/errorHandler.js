@@ -22,11 +22,14 @@ export const getErrorMessage = (error) => {
   const lowerMessage = errorMessage.toLowerCase()
   
   // Network/Connection errors
-  if (errorMessage === 'Network request failed' || 
+  if (errorMessage === 'Network request failed' ||
       errorMessage === 'Failed to fetch' ||
       errorMessage.includes('NetworkError') ||
-      errorMessage.includes('network')) {
-    return 'Unable to connect to the server. Please check your internet connection.'
+      errorMessage.includes('network') ||
+      errorMessage.includes('java io') ||
+      errorMessage.includes('failed to download') ||
+      errorMessage.includes('download failed')) {
+    return 'Unable to connect to the server. Please check your internet connection and ensure the backend server is running.'
   }
   
   if (error.isTimeout || errorMessage.includes('timeout')) {

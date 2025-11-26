@@ -72,12 +72,16 @@ export const apiFetch = async (path, options = {}) => {
     }
     
     // Handle network errors
-    if (err.message === 'Network request failed' || 
+    if (err.message === 'Network request failed' ||
         err.message === 'Failed to fetch' ||
+        err.message === 'failed to download java io' ||
+        err.message.includes('java io') ||
+        err.message.includes('download failed') ||
         !err.message) {
       const networkError = new Error('Network request failed')
       networkError.status = 0
       networkError.isNetworkError = true
+      networkError.originalError = err.message
       throw networkError
     }
     

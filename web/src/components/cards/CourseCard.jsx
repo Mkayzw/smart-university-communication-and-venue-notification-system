@@ -9,7 +9,7 @@ import { useApiMutation } from '../../hooks/useApi.js'
 
 export const CourseCard = ({ course, onUpdate }) => {
   const { user } = useAuth()
-  const { id, code, name, department, lecturer, _count, isEnrolled } = course
+  const { id, code, name, department, lecturer, _count } = course
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
@@ -81,7 +81,6 @@ export const CourseCard = ({ course, onUpdate }) => {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{code}</p>
             <h3 className="mt-1 text-lg font-semibold text-slate-900 group-hover:text-brand-600">{name}</h3>
           </div>
-          {isEnrolled ? <StatusPill tone="success">Enrolled</StatusPill> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-500">
           {department ? (

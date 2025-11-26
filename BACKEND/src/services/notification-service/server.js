@@ -306,6 +306,122 @@ eventBus.subscribe('course.created', async (data) => {
   }
 });
 
+// Handle announcement notifications
+eventBus.subscribe('announcement.created', async (data) => {
+  try {
+    const { announcement, targetAudience, excludeUserId } = data;
+    
+    // For announcements with targetAudience, we need to filter appropriately
+    if (targetAudience === 'ALL') {
+      // Send to all users except the author
+      const allUsers = await prisma.user.findMany({
+        where: {
+          id: { not: excludeUserId }
+        }
+      });
+      
+      for (const user of allUsers) {
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            type: 'NEW_ANNOUNCEMENT',
+            message: `New announcement: ${announcement.title}`,
+            link: `/announcements/${announcement.id}`
+          }
+        });
+        
+        // Send real-time notification
+        io.to(`user:${user.id}`).emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`,
+          timestamp: new Date()
+        });
+        
+        // Emit notification creation event
+        socketEmitter.emit('notification.created', {
+          userId: user.id,
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      }
+    } else if (targetAudience === 'STUDENTS') {
+      // Send only to students
+      const students = await prisma.user.findMany({
+        where: {
+          role: 'STUDENT',
+          id: { not: excludeUserId }
+        }
+      });
+      
+      for (const student of students) {
+        await prisma.notification.create({
+          data: {
+            userId: student.id,
+            type: 'NEW_ANNOUNCEMENT',
+            message: `New announcement: ${announcement.title}`,
+            link: `/announcements/${announcement.id}`
+          }
+        });
+        
+        // Send real-time notification
+        io.to(`user:${student.id}`).emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`,
+          timestamp: new Date()
+        });
+        
+        // Emit notification creation event
+        socketEmitter.emit('notification.created', {
+          userId: student.id,
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      }
+    } else if (targetAudience === 'LECTURERS') {
+      // Send only to lecturers
+      const lecturers = await prisma.user.findMany({
+        where: {
+          role: 'LECTURER',
+          id: { not: excludeUserId }
+        }
+      });
+      
+      for (const lecturer of lecturers) {
+        await prisma.notification.create({
+          data: {
+            userId: lecturer.id,
+            type: 'NEW_ANNOUNCEMENT',
+            message: `New announcement: ${announcement.title}`,
+            link: `/announcements/${announcement.id}`
+          }
+        });
+        
+        // Send real-time notification
+        io.to(`user:${lecturer.id}`).emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`,
+          timestamp: new Date()
+        });
+        
+        // Emit notification creation event
+        socketEmitter.emit('notification.created', {
+          userId: lecturer.id,
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${announcement.title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error handling announcement.created event:', error);
+  }
+});
+
 eventBus.subscribe('course.enrolled', async (data) => {
   try {
     // Create notification for course enrollment
@@ -337,6 +453,109 @@ eventBus.subscribe('course.enrolled', async (data) => {
     console.error('Error handling course.enrolled event:', error);
   }
 });
+
+// Handle schedule notifications
+eventBus.subscribe('schedule.created', async (data) => {
+  try {
+    // Notify enrolled students about new schedule
+    await notifyCourseStudents({
+      courseId: data.courseId,
+      type: 'SCHEDULE_CREATED',
+      message: `New schedule added for ${data.courseName} on ${data.dayOfWeek}`,
+      link: `/courses/${data.courseId}`
+    });
+  } catch (error) {
+    console.error('Error handling schedule.created event:', error);
+  }
+});
+
+eventBus.subscribe('schedule.updated', async (data) => {
+  try {
+    // Notify enrolled students about schedule update
+    await notifyCourseStudents({
+      courseId: data.courseId,
+      type: 'SCHEDULE_UPDATED',
+      message: `Schedule updated for ${data.courseName}`,
+      link: `/courses/${data.courseId}`
+    });
+  } catch (error) {
+    console.error('Error handling schedule.updated event:', error);
+  }
+});
+
+eventBus.subscribe('schedule.deleted', async (data) => {
+  try {
+    // Notify enrolled students about schedule deletion
+    await notifyCourseStudents({
+      courseId: data.courseId,
+      type: 'SCHEDULE_DELETED',
+      message: 'A schedule you were enrolled in has been removed',
+      link: `/courses/${data.courseId}`
+    });
+  } catch (error) {
+    console.error('Error handling schedule.deleted event:', error);
+  }
+});
+
+// Helper function to notify course students (reused from schedule service)
+const notifyCourseStudents = async (options) => {
+  try {
+    const { courseId, type, message, link, excludeStudentIds = [] } = options;
+
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        courseId,
+        studentId: excludeStudentIds.length > 0 ? { notIn: excludeStudentIds } : undefined
+      },
+      select: {
+        studentId: true
+      }
+    });
+
+    if (enrollments.length === 0) {
+      return [];
+    }
+
+    const studentIds = enrollments.map(e => e.studentId);
+
+    // Send notifications via Notification Service
+    for (const studentId of studentIds) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: studentId,
+            type,
+            message,
+            link
+          }
+        });
+
+        // Send real-time notification
+        io.to(`user:${studentId}`).emit('notification', {
+          type,
+          message,
+          link,
+          timestamp: new Date()
+        });
+
+        // Emit notification creation event
+        socketEmitter.emit('notification.created', {
+          userId: studentId,
+          type,
+          message,
+          link
+        });
+      } catch (error) {
+        console.error(`Failed to notify student ${studentId}:`, error.message);
+      }
+    }
+
+    return studentIds;
+  } catch (error) {
+    console.error('Error notifying course students:', error);
+    return [];
+  }
+};
 
 // Only listen if we are running locally (not on Vercel)
 if (process.env.NODE_ENV !== 'production') {

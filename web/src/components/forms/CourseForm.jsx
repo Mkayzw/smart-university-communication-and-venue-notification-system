@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useApiQuery } from '../../hooks/useApi.js';
+import { Search } from 'lucide-react';
 
 const CourseForm = ({ course, lecturers = [], onSubmit, onCancel, isLoading, isAdmin }) => {
   const [formData, setFormData] = useState({
@@ -11,6 +13,32 @@ const CourseForm = ({ course, lecturers = [], onSubmit, onCancel, isLoading, isA
   });
 
   const [errors, setErrors] = useState({});
+  const [lecturerSearch, setLecturerSearch] = useState('');
+  const [showLecturerDropdown, setShowLecturerDropdown] = useState(false);
+  const lecturerDropdownRef = useRef(null);
+  const lecturerInputRef = useRef(null);
+
+  // Fetch lecturers if admin and no lecturers provided
+  const lecturersQuery = useApiQuery('/users', {
+    params: {
+      role: 'LECTURER',
+      ...(lecturerSearch && lecturerSearch.trim() ? { search: lecturerSearch.trim() } : {}),
+      limit: 50
+    },
+    enabled: isAdmin && lecturers.length === 0
+  });
+  
+  const allLecturers = lecturers.length > 0 ? lecturers : (lecturersQuery.data?.data || []);
+  const selectedLecturer = allLecturers.find(l => l.id === formData.lecturerId);
+
+  // Filter lecturers based on search
+  const filteredLecturers = lecturerSearch
+    ? allLecturers.filter(lec =>
+        `${lec.firstName} ${lec.lastName}`.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
+        lec.email?.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
+        lec.department?.toLowerCase().includes(lecturerSearch.toLowerCase())
+      ).slice(0, 10)
+    : allLecturers.slice(0, 10);
 
   useEffect(() => {
     if (course) {
@@ -22,8 +50,43 @@ const CourseForm = ({ course, lecturers = [], onSubmit, onCancel, isLoading, isA
         credits: course.credits || '',
         lecturerId: course.lecturerId || ''
       });
+      
+      // Set initial lecturer search if there's a selected lecturer
+      if (course.lecturer) {
+        setLecturerSearch(`${course.lecturer.firstName} ${course.lecturer.lastName}`);
+      }
     }
   }, [course]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        lecturerDropdownRef.current &&
+        !lecturerDropdownRef.current.contains(event.target) &&
+        lecturerInputRef.current &&
+        !lecturerInputRef.current.contains(event.target)
+      ) {
+        setShowLecturerDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleLecturerSelect = (lecturer) => {
+    setFormData({ ...formData, lecturerId: lecturer.id });
+    setLecturerSearch(`${lecturer.firstName} ${lecturer.lastName}`);
+    setShowLecturerDropdown(false);
+  };
+
+  const clearLecturer = () => {
+    setFormData({ ...formData, lecturerId: '' });
+    setLecturerSearch('');
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -157,25 +220,95 @@ const CourseForm = ({ course, lecturers = [], onSubmit, onCancel, isLoading, isA
         </div>
       </div>
 
-      {isAdmin && lecturers.length > 0 && (
+      {isAdmin && (
         <div>
           <label htmlFor="lecturerId" className="block text-sm font-medium text-gray-700 mb-1">
             Assign Lecturer
           </label>
-          <select
-            id="lecturerId"
-            name="lecturerId"
-            value={formData.lecturerId}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select a lecturer (optional)</option>
-            {lecturers.map((lecturer) => (
-              <option key={lecturer.id} value={lecturer.id}>
-                {lecturer.firstName} {lecturer.lastName} - {lecturer.department}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            {selectedLecturer ? (
+              <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                <div>
+                  <p className="text-sm font-semibold text-blue-700">
+                    {selectedLecturer.firstName} {selectedLecturer.lastName}
+                  </p>
+                  <p className="text-xs text-blue-600">{selectedLecturer.email}</p>
+                  {selectedLecturer.department && (
+                    <p className="text-xs text-blue-500">{selectedLecturer.department}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={clearLecturer}
+                  className="text-blue-600 hover:text-blue-700 font-bold text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    ref={lecturerInputRef}
+                    type="text"
+                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Search lecturers by name, email, or department..."
+                    value={lecturerSearch}
+                    onChange={(e) => {
+                      setLecturerSearch(e.target.value);
+                      setShowLecturerDropdown(true);
+                    }}
+                    onFocus={() => setShowLecturerDropdown(true)}
+                  />
+                </div>
+                
+                {showLecturerDropdown && (
+                  <div
+                    ref={lecturerDropdownRef}
+                    className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                  >
+                    {lecturersQuery.isLoading ? (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                        Loading lecturers...
+                      </div>
+                    ) : filteredLecturers.length > 0 ? (
+                      <>
+                        <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+                          <p className="text-xs font-semibold text-gray-600">Select lecturer to assign</p>
+                        </div>
+                        {filteredLecturers.map(lecturer => (
+                          <button
+                            key={lecturer.id}
+                            type="button"
+                            className="w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
+                            onClick={() => handleLecturerSelect(lecturer)}
+                          >
+                            <p className="text-sm font-semibold text-gray-700">
+                              {lecturer.firstName} {lecturer.lastName}
+                            </p>
+                            <p className="text-xs text-gray-500">{lecturer.email}</p>
+                            {lecturer.department && (
+                              <p className="text-xs text-gray-400">{lecturer.department}</p>
+                            )}
+                          </button>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                        {lecturerSearch ? 'No lecturers found matching your search' : 'No lecturers available'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {course && (
+            <p className="text-xs text-gray-500 mt-1">
+              Current: {course.lecturer ? `${course.lecturer.firstName} ${course.lecturer.lastName}` : 'No lecturer assigned'}
+            </p>
+          )}
         </div>
       )}
 

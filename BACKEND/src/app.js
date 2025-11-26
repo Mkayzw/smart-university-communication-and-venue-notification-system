@@ -33,7 +33,7 @@ const {
 const app = express();
 const server = http.createServer(app);
 
-// Trust proxy headers in production (required for Render and other platforms)
+// Trust proxy headers in production 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', true);
 }
@@ -601,7 +601,7 @@ app.get('/api/courses/:id', authenticate, async (req, res, next) => {
 // Create course (Lecturer/Admin only)
 app.post('/api/courses', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
-    const { code, name, description, credits, department, maxStudents } = req.body;
+    const { code, name, description, credits, department } = req.body;
 
     validateRequired(['code', 'name', 'credits', 'department'], req.body);
 
@@ -612,7 +612,6 @@ app.post('/api/courses', authenticate, authorize('LECTURER', 'ADMIN'), async (re
         description,
         credits,
         department,
-        maxStudents: maxStudents || 50,
         lecturerId: req.user.role === 'LECTURER' ? req.user.id : req.body.lecturerId
       },
       include: {
@@ -628,7 +627,7 @@ app.post('/api/courses', authenticate, authorize('LECTURER', 'ADMIN'), async (re
     });
 
     // Emit socket event
-    req.socketUtils.emitCourseUpdate('created', course);
+    req.socketUtils.emitToAll('course-created', course);
 
     res.status(201).json({
       success: true,
@@ -673,6 +672,18 @@ app.post('/api/courses/:id/enroll', authenticate, authorize('STUDENT'), async (r
       }
     });
 
+    // Notify student about enrollment using notification service
+    try {
+      await notifyCourseStudents({
+        courseId: id,
+        type: 'COURSE_ENROLLED',
+        message: `You have successfully enrolled in ${enrollment.course.name}`,
+        link: `/courses/${id}`
+      });
+    } catch (error) {
+      console.error('Failed to send enrollment notification:', error);
+    }
+
     res.status(201).json({
       success: true,
       data: enrollment
@@ -701,6 +712,18 @@ app.delete('/api/courses/:id/enroll', authenticate, authorize('STUDENT'), async 
     await prisma.enrollment.delete({
       where: { id: enrollment.id }
     });
+
+    // Notify student about course drop using notification service
+    try {
+      await notifyCourseStudents({
+        courseId: enrollment.course.id,
+        type: 'COURSE_DROPPED',
+        message: `You have been unenrolled from ${enrollment.course.name}`,
+        link: `/courses/${enrollment.course.id}`
+      });
+    } catch (error) {
+      console.error('Failed to send course drop notification:', error);
+    }
 
     res.status(200).json({
       success: true,
@@ -935,17 +958,67 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
     });
 
     // Emit socket event
-    req.socketUtils.emitAnnouncementUpdate('created', announcement);
+    req.socketUtils.broadcastAnnouncement(announcement);
 
     // Create database notifications for target audience
     try {
-      await createNotification({
-        targetAudience: targetAudience || 'ALL',
-        type: 'NEW_ANNOUNCEMENT',
-        message: `New announcement: ${title}`,
-        link: `/announcements/${announcement.id}`,
-        excludeUserId: req.user.id
-      });
+      if (targetAudience === 'STUDENTS') {
+        // Get all students
+        const students = await prisma.user.findMany({
+          where: { role: 'STUDENT' },
+          select: { id: true }
+        });
+        
+        // Create notifications for each student
+        await Promise.all(students.map(student =>
+          prisma.notification.create({
+            data: {
+              userId: student.id,
+              type: 'NEW_ANNOUNCEMENT',
+              message: `New announcement: ${title}`,
+              link: `/announcements/${announcement.id}`
+            }
+          })
+        ));
+      } else if (targetAudience === 'LECTURERS') {
+        // Get all lecturers
+        const lecturers = await prisma.user.findMany({
+          where: { role: 'LECTURER' },
+          select: { id: true }
+        });
+        
+        // Create notifications for each lecturer
+        await Promise.all(lecturers.map(lecturer =>
+          prisma.notification.create({
+            data: {
+              userId: lecturer.id,
+              type: 'NEW_ANNOUNCEMENT',
+              message: `New announcement: ${title}`,
+              link: `/announcements/${announcement.id}`
+            }
+          })
+        ));
+      } else {
+        // ALL - get all users except author
+        const users = await prisma.user.findMany({
+          where: {
+            id: { not: req.user.id }
+          },
+          select: { id: true }
+        });
+        
+        // Create notifications for each user
+        await Promise.all(users.map(user =>
+          prisma.notification.create({
+            data: {
+              userId: user.id,
+              type: 'NEW_ANNOUNCEMENT',
+              message: `New announcement: ${title}`,
+              link: `/announcements/${announcement.id}`
+            }
+          })
+        ));
+      }
 
       // Emit Socket.IO notifications based on target audience
       if (targetAudience === 'STUDENTS') {
@@ -955,7 +1028,7 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
           link: `/announcements/${announcement.id}`
         });
       } else if (targetAudience === 'LECTURERS') {
-        io.to('role:LECTURER').emit('notification', {
+        io.to('role:LECTURERS').emit('notification', {
           type: 'NEW_ANNOUNCEMENT',
           message: `New announcement: ${title}`,
           link: `/announcements/${announcement.id}`
@@ -1058,7 +1131,7 @@ app.put('/api/announcements/:id', authenticate, async (req, res, next) => {
     });
 
     // Emit socket event
-    req.socketUtils.emitAnnouncementUpdate('updated', updatedAnnouncement);
+    req.socketUtils.broadcastAnnouncement(updatedAnnouncement);
 
     res.status(200).json({
       success: true,
@@ -1092,8 +1165,8 @@ app.delete('/api/announcements/:id', authenticate, async (req, res, next) => {
       where: { id }
     });
 
-    // Emit socket event
-    req.socketUtils.emitAnnouncementUpdate('deleted', { id });
+    // Emit socket event for deletion
+    req.socketUtils.emitToAll('announcement-deleted', { id });
 
     res.status(200).json({
       success: true,
@@ -1221,8 +1294,23 @@ app.get('/api/schedules/my-schedule', authenticate, async (req, res, next) => {
 // Get all schedules
 app.get('/api/schedules', authenticate, async (req, res, next) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, dayOfWeek, semester, venueId, lecturerId, courseCode, courseId } = req.query;
     const where = {};
+    
+    // Apply filters
+    if (dayOfWeek) where.dayOfWeek = dayOfWeek;
+    if (semester) where.semester = semester;
+    if (venueId) where.venueId = venueId;
+    if (lecturerId) where.lecturerId = lecturerId;
+    if (courseId) where.courseId = courseId;
+    if (courseCode) {
+      where.course = {
+        code: {
+          contains: courseCode,
+          mode: 'insensitive'
+        }
+      };
+    }
     
     // Students see only their enrolled courses' schedules
     if (req.user.role === 'STUDENT') {
@@ -1230,7 +1318,14 @@ app.get('/api/schedules', authenticate, async (req, res, next) => {
         where: { studentId: req.user.id },
         select: { courseId: true }
       });
-      where.courseId = { in: enrollments.map(e => e.courseId) };
+      // If there's already a courseId filter, we need to intersect with enrolled courses
+      if (where.courseId) {
+        where.courseId = {
+          in: enrollments.map(e => e.courseId).filter(id => id === where.courseId)
+        };
+      } else {
+        where.courseId = { in: enrollments.map(e => e.courseId) };
+      }
     }
     
     // Lecturers see their courses' schedules
@@ -1287,7 +1382,7 @@ app.get('/api/schedules', authenticate, async (req, res, next) => {
 // Create schedule (Lecturer/Admin only)
 app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
-    const { courseId, venueId, dayOfWeek, startTime, endTime, semester, type } = req.body;
+    const { courseId, venueId, dayOfWeek, startTime, endTime, semester } = req.body;
 
     // Validate required fields
     validateRequired(['courseId', 'venueId', 'dayOfWeek', 'startTime', 'endTime', 'semester'], req.body);
@@ -1381,8 +1476,7 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
         dayOfWeek,
         startTime,
         endTime,
-        semester,
-        type: type || 'LECTURE'
+        semester
       },
       include: {
         course: {
@@ -1400,24 +1494,35 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
     });
 
     // Emit socket event
-    req.socketUtils.emitScheduleUpdate('created', schedule);
+    req.socketUtils.broadcastScheduleUpdate(schedule);
 
     // Notify enrolled students about the new schedule
     try {
-      await notifyCourseStudents({
-        courseId,
-        type: 'SCHEDULE_CREATED',
-        message: `New schedule added for ${schedule.course.name} on ${dayOfWeek} at ${startTime} in ${schedule.venue.name}`,
-        link: `/schedules/${schedule.id}`
-      });
-
-      // Emit Socket.IO notifications to affected users
+      // Get enrolled students for this course and create notifications directly
       const enrolledStudents = await prisma.enrollment.findMany({
         where: { courseId },
         select: { studentId: true }
       });
 
-      enrolledStudents.forEach(enrollment => {
+      // Create notifications for each enrolled student
+      await Promise.all(enrolledStudents.map(enrollment =>
+        prisma.notification.create({
+          data: {
+            userId: enrollment.studentId,
+            type: 'SCHEDULE_CREATED',
+            message: `New schedule added for ${schedule.course.name} on ${dayOfWeek} at ${startTime} in ${schedule.venue.name}`,
+            link: `/schedules/${schedule.id}`
+          }
+        })
+      ));
+
+      // Emit Socket.IO notifications to affected users
+      const scheduleEnrolledStudents = await prisma.enrollment.findMany({
+        where: { courseId },
+        select: { studentId: true }
+      });
+
+      scheduleEnrolledStudents.forEach(enrollment => {
         io.to(`user:${enrollment.studentId}`).emit('notification', {
           type: 'SCHEDULE_CREATED',
           message: `New schedule added for ${schedule.course.name} on ${dayOfWeek}`,
@@ -1442,7 +1547,7 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
 app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { venueId, dayOfWeek, startTime, endTime, semester, type } = req.body;
+    const { venueId, dayOfWeek, startTime, endTime, semester } = req.body;
 
     // Get existing schedule
     const existingSchedule = await prisma.schedule.findUnique({
@@ -1512,7 +1617,6 @@ app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), asyn
 
     // Update other fields
     if (dayOfWeek) updateData.dayOfWeek = dayOfWeek;
-    if (type) updateData.type = type;
 
     // Check for venue conflicts if any relevant field changed
     if (venueId || dayOfWeek || startTime || endTime || semester) {
@@ -1565,23 +1669,29 @@ app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), asyn
     });
 
     // Emit socket event
-    req.socketUtils.emitScheduleUpdate('updated', updatedSchedule);
+    req.socketUtils.broadcastScheduleUpdate(updatedSchedule);
 
     // Notify enrolled students about the schedule update
     try {
-      await notifyCourseStudents({
-        courseId: updatedSchedule.course.id,
-        type: 'SCHEDULE_UPDATED',
-        message: `Schedule updated for ${updatedSchedule.course.name} on ${updatedSchedule.dayOfWeek} at ${updatedSchedule.startTime}`,
-        link: `/schedules/${id}`
-      });
-
-      // Emit Socket.IO notifications to affected users
+      // Get enrolled students for this course and create notifications directly
       const enrolledStudents = await prisma.enrollment.findMany({
         where: { courseId: updatedSchedule.course.id },
         select: { studentId: true }
       });
 
+      // Create notifications for each enrolled student
+      await Promise.all(enrolledStudents.map(enrollment =>
+        prisma.notification.create({
+          data: {
+            userId: enrollment.studentId,
+            type: 'SCHEDULE_UPDATED',
+            message: `Schedule updated for ${updatedSchedule.course.name} on ${updatedSchedule.dayOfWeek} at ${updatedSchedule.startTime}`,
+            link: `/schedules/${id}`
+          }
+        })
+      ));
+
+      // Emit Socket.IO notifications to affected users
       enrolledStudents.forEach(enrollment => {
         io.to(`user:${enrollment.studentId}`).emit('notification', {
           type: 'SCHEDULE_UPDATED',
@@ -1635,24 +1745,30 @@ app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), a
       where: { id }
     });
 
-    // Emit socket event
-    req.socketUtils.emitScheduleUpdate('deleted', { id });
+    // Emit socket event for deletion
+    req.socketUtils.emitToCourse(schedule.course.id, 'schedule-deleted', { id });
 
     // Notify enrolled students about the schedule deletion
     try {
-      await notifyCourseStudents({
-        courseId: schedule.course.id,
-        type: 'SCHEDULE_DELETED',
-        message: `Schedule cancelled for ${schedule.course.name} on ${schedule.dayOfWeek} at ${schedule.startTime}`,
-        link: `/courses/${schedule.course.id}`
-      });
-
-      // Emit Socket.IO notifications to affected users
+      // Get enrolled students for this course and create notifications directly
       const enrolledStudents = await prisma.enrollment.findMany({
         where: { courseId: schedule.course.id },
         select: { studentId: true }
       });
 
+      // Create notifications for each enrolled student
+      await Promise.all(enrolledStudents.map(enrollment =>
+        prisma.notification.create({
+          data: {
+            userId: enrollment.studentId,
+            type: 'SCHEDULE_DELETED',
+            message: `Schedule cancelled for ${schedule.course.name} on ${schedule.dayOfWeek} at ${schedule.startTime}`,
+            link: `/courses/${schedule.course.id}`
+          }
+        })
+      ));
+
+      // Emit Socket.IO notifications to affected users
       enrolledStudents.forEach(enrollment => {
         io.to(`user:${enrollment.studentId}`).emit('notification', {
           type: 'SCHEDULE_DELETED',
@@ -1863,7 +1979,7 @@ app.post('/api/venues', authenticate, authorize('ADMIN'), async (req, res, next)
     });
 
     // Emit socket event
-    req.socketUtils.emitVenueUpdate('created', venue);
+    req.socketUtils.broadcastVenueChange(venue);
 
     res.status(201).json({
       success: true,
@@ -1891,7 +2007,7 @@ app.put('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res, ne
     });
 
     // Emit socket event
-    req.socketUtils.emitVenueUpdate('updated', venue);
+    req.socketUtils.broadcastVenueChange(venue);
 
     res.status(200).json({
       success: true,
@@ -1919,7 +2035,7 @@ app.patch('/api/venues/:id/availability', authenticate, authorize('ADMIN'), asyn
     });
 
     // Emit socket event
-    req.socketUtils.emitVenueUpdate('updated', venue);
+    req.socketUtils.broadcastVenueChange(venue);
 
     res.status(200).json({
       success: true,
@@ -1939,8 +2055,8 @@ app.delete('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res,
       where: { id }
     });
 
-    // Emit socket event
-    req.socketUtils.emitVenueUpdate('deleted', { id });
+    // Emit socket event for deletion
+    req.socketUtils.emitToAll('venue-deleted', { id });
 
     res.status(200).json({
       success: true,
@@ -1971,7 +2087,8 @@ app.get('/api/notifications', authenticate, async (req, res, next) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    const [notifications, total] = await Promise.all([
+    // Get all notifications first
+    const [allNotifications, total] = await Promise.all([
       prisma.notification.findMany({
         where,
         skip,
@@ -1981,14 +2098,84 @@ app.get('/api/notifications', authenticate, async (req, res, next) => {
       prisma.notification.count({ where })
     ]);
 
+    // Filter notifications based on course enrollment for students
+    let filteredNotifications = allNotifications;
+    
+    if (req.user.role === 'STUDENT') {
+      // Get student's enrolled courses
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: req.user.id },
+        select: { courseId: true }
+      });
+      const enrolledCourseIds = enrollments.map(e => e.courseId);
+
+      // Get all schedule notifications and their course IDs in one query
+      const scheduleNotifications = allNotifications.filter(n => n.link && n.link.includes('/schedules/'));
+      const scheduleIds = scheduleNotifications.map(n => {
+        const match = n.link.match(/\/schedules\/([^\/\?]+)/);
+        return match ? match[1] : null;
+      }).filter(Boolean);
+      
+      const schedules = await prisma.schedule.findMany({
+        where: { id: { in: scheduleIds } },
+        select: { id: true, courseId: true }
+      });
+      
+      const scheduleToCourseMap = Object.fromEntries(
+        schedules.map(s => [s.id, s.courseId])
+      );
+
+      // Filter notifications
+      filteredNotifications = allNotifications.filter(notification => {
+        // Allow non-course related notifications (announcements, system, etc.)
+        if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
+          return true;
+        }
+        
+        // Always allow announcement notifications
+        if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
+          return true;
+        }
+        
+        // For course-related notifications via /courses/ link
+        if (notification.link.includes('/courses/')) {
+          const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
+          if (courseIdMatch) {
+            const courseId = courseIdMatch[1];
+            return enrolledCourseIds.includes(courseId);
+          }
+        }
+        
+        // For schedule notifications via /schedules/ link - use pre-fetched map
+        if (notification.link.includes('/schedules/')) {
+          const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
+          if (scheduleIdMatch) {
+            const scheduleId = scheduleIdMatch[1];
+            const courseId = scheduleToCourseMap[scheduleId];
+            return courseId && enrolledCourseIds.includes(courseId);
+          }
+        }
+        
+        // Debug: Log any notifications that don't match patterns
+        console.log(`Notification filtering debug for user ${req.user.id}:`, {
+          type: notification.type,
+          link: notification.link,
+          message: notification.message,
+          allowed: false
+        });
+        
+        return false;
+      });
+    }
+
     res.status(200).json({
       success: true,
-      data: notifications,
+      data: filteredNotifications,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
+        total: filteredNotifications.length,
+        pages: Math.ceil(filteredNotifications.length / parseInt(limit))
       }
     });
   } catch (error) {
@@ -1999,16 +2186,87 @@ app.get('/api/notifications', authenticate, async (req, res, next) => {
 // Get unread notification count
 app.get('/api/notifications/unread/count', authenticate, async (req, res, next) => {
   try {
-    const count = await prisma.notification.count({
+    // Get all unread notifications first
+    const allUnreadNotifications = await prisma.notification.findMany({
       where: {
         userId: req.user.id,
         read: false
       }
     });
 
+    // Filter notifications based on course enrollment for students
+    let filteredNotifications = allUnreadNotifications;
+    
+    if (req.user.role === 'STUDENT') {
+      // Get student's enrolled courses
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: req.user.id },
+        select: { courseId: true }
+      });
+      const enrolledCourseIds = enrollments.map(e => e.courseId);
+
+      // Get all schedule notifications and their course IDs in one query
+      const scheduleNotifications = allUnreadNotifications.filter(n => n.link && n.link.includes('/schedules/'));
+      const scheduleIds = scheduleNotifications.map(n => {
+        const match = n.link.match(/\/schedules\/([^\/\?]+)/);
+        return match ? match[1] : null;
+      }).filter(Boolean);
+      
+      const schedules = await prisma.schedule.findMany({
+        where: { id: { in: scheduleIds } },
+        select: { id: true, courseId: true }
+      });
+      
+      const scheduleToCourseMap = Object.fromEntries(
+        schedules.map(s => [s.id, s.courseId])
+      );
+
+      // Filter notifications
+      filteredNotifications = allUnreadNotifications.filter(notification => {
+        // Allow non-course related notifications (announcements, system, etc.)
+        if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
+          return true;
+        }
+        
+        // Always allow announcement notifications
+        if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
+          return true;
+        }
+        
+        // For course-related notifications via /courses/ link
+        if (notification.link.includes('/courses/')) {
+          const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
+          if (courseIdMatch) {
+            const courseId = courseIdMatch[1];
+            return enrolledCourseIds.includes(courseId);
+          }
+        }
+        
+        // For schedule notifications via /schedules/ link - use pre-fetched map
+        if (notification.link.includes('/schedules/')) {
+          const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
+          if (scheduleIdMatch) {
+            const scheduleId = scheduleIdMatch[1];
+            const courseId = scheduleToCourseMap[scheduleId];
+            return courseId && enrolledCourseIds.includes(courseId);
+          }
+        }
+        
+        // Debug: Log any notifications that don't match patterns
+        console.log(`Unread notification filtering debug for user ${req.user.id}:`, {
+          type: notification.type,
+          link: notification.link,
+          message: notification.message,
+          allowed: false
+        });
+        
+        return false;
+      });
+    }
+
     res.status(200).json({
       success: true,
-      data: { count }
+      data: { count: filteredNotifications.length }
     });
   } catch (error) {
     next(error);
@@ -2114,6 +2372,165 @@ app.post('/api/notifications/push-token', authenticate, async (req, res, next) =
   }
 });
 
+// Generate automated reminders for upcoming classes (Admin only)
+app.post('/api/notifications/generate-reminders', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { hoursBefore = 24, daysAhead = 7 } = req.body;
+    
+    // Get current date and time
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + (daysAhead * 24 * 60 * 60 * 1000));
+    
+    // Get current day of week (0-6, where 0 is Sunday)
+    const currentDayOfWeek = now.getDay();
+    
+    // Get all schedules for the next few days
+    const upcomingSchedules = await prisma.schedule.findMany({
+      include: {
+        course: {
+          include: {
+            enrollments: {
+              include: {
+                student: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    pushToken: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        venue: true
+      }
+    });
+
+    // Filter schedules that are within the time window and match current day
+    const relevantSchedules = upcomingSchedules.filter(schedule => {
+      // Convert day names to numbers (0-6)
+      const dayMap = {
+        'SUNDAY': 0,
+        'MONDAY': 1,
+        'TUESDAY': 2,
+        'WEDNESDAY': 3,
+        'THURSDAY': 4,
+        'FRIDAY': 5,
+        'SATURDAY': 6
+      };
+      
+      const scheduleDay = dayMap[schedule.dayOfWeek];
+      
+      // Check if this schedule occurs in the next few days
+      const daysUntilSchedule = (scheduleDay - currentDayOfWeek + 7) % 7;
+      
+      return daysUntilSchedule <= daysAhead && daysUntilSchedule >= 0;
+    });
+
+    let remindersCreated = 0;
+    let notificationsSent = 0;
+
+    // Process each relevant schedule
+    for (const schedule of relevantSchedules) {
+      // Calculate days until this schedule
+      const dayMap = {
+        'SUNDAY': 0,
+        'MONDAY': 1,
+        'TUESDAY': 2,
+        'WEDNESDAY': 3,
+        'THURSDAY': 4,
+        'FRIDAY': 5,
+        'SATURDAY': 6
+      };
+      
+      const scheduleDay = dayMap[schedule.dayOfWeek];
+      const daysUntilSchedule = (scheduleDay - currentDayOfWeek + 7) % 7;
+      
+      // Calculate the exact date and time of the schedule
+      const scheduleDate = new Date(now.getTime() + (daysUntilSchedule * 24 * 60 * 60 * 1000));
+      const [hours, minutes] = schedule.startTime.split(':');
+      scheduleDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      
+      // Calculate reminder time (hours before the schedule)
+      const reminderTime = new Date(scheduleDate.getTime() - (hoursBefore * 60 * 60 * 1000));
+      
+      // Only create reminders if the reminder time is in the future
+      if (reminderTime > now) {
+        // Create notifications for each enrolled student
+        for (const enrollment of schedule.course.enrollments) {
+          const student = enrollment.student;
+          
+          // Check if reminder already exists to avoid duplicates
+          const existingReminder = await prisma.notification.findFirst({
+            where: {
+              userId: student.id,
+              type: 'SCHEDULE_REMINDER',
+              link: `/schedules/${schedule.id}`,
+              createdAt: {
+                gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
+              }
+            }
+          });
+          
+          if (!existingReminder) {
+            // Create database notification
+            await prisma.notification.create({
+              data: {
+                userId: student.id,
+                type: 'SCHEDULE_REMINDER',
+                message: `Reminder: ${schedule.course.name} class on ${schedule.dayOfWeek} at ${schedule.startTime} in ${schedule.venue.name}`,
+                link: `/schedules/${schedule.id}`
+              }
+            });
+            
+            remindersCreated++;
+            
+            // Send real-time notification via Socket.IO
+            io.to(`user:${student.id}`).emit('notification', {
+              type: 'SCHEDULE_REMINDER',
+              message: `Reminder: ${schedule.course.name} class on ${schedule.dayOfWeek} at ${schedule.startTime}`,
+              link: `/schedules/${schedule.id}`
+            });
+            
+            // Send push notification if student has a push token
+            if (student.pushToken && Expo.isExpoPushToken(student.pushToken)) {
+              try {
+                await expo.sendPushNotificationsAsync([{
+                  to: student.pushToken,
+                  sound: 'default',
+                  title: 'Class Reminder',
+                  body: `${schedule.course.name} class on ${schedule.dayOfWeek} at ${schedule.startTime} in ${schedule.venue.name}`,
+                  data: {
+                    type: 'SCHEDULE_REMINDER',
+                    scheduleId: schedule.id
+                  }
+                }]);
+                notificationsSent++;
+              } catch (pushError) {
+                console.error('Error sending push notification:', pushError);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Generated ${remindersCreated} reminders and sent ${notificationsSent} push notifications for upcoming classes`,
+      data: {
+        remindersCreated,
+        notificationsSent,
+        schedulesProcessed: relevantSchedules.length
+      }
+    });
+  } catch (error) {
+    console.error('Error generating reminders:', error);
+    next(error);
+  }
+});
+
 // ==================== DASHBOARD STATS ====================
 
 app.get('/api/dashboard/stats', authenticate, async (req, res, next) => {
@@ -2213,7 +2630,7 @@ app.use(errorHandler);
 
 // Server startup will be handled by server.js
 // Export PORT for server.js to use
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

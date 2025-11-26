@@ -188,16 +188,12 @@ const createSchedule = async (req, res, next) => {
       }
     });
 
-    // Notify enrolled students about the new schedule
-    await notifyCourseStudents({
-      courseId,
-      type: 'SCHEDULE_CREATED',
-      message: `New schedule added for ${schedule.course.name} on ${dayOfWeek}`,
-      link: `/courses/${courseId}`
-    });
-
     // Emit schedule creation event
-    socketEmitter.emit('schedule.created', schedule);
+    socketEmitter.emit('schedule.created', {
+      courseId,
+      courseName: schedule.course.name,
+      dayOfWeek
+    });
 
     res.status(201).json({
       success: true,
@@ -517,30 +513,11 @@ const updateSchedule = async (req, res, next) => {
       }
     });
 
-    // Notify about schedule change
-    try {
-      await serviceRequest('notification-service', '/', {
-        method: 'POST',
-        data: {
-            type: 'SCHEDULE_UPDATE',
-            message: `Schedule updated for ${updatedSchedule.course.name}`,
-            link: `/schedules/${id}`,
-            targetAudience: 'ALL' 
-        }
-      });
-    } catch (err) {
-      console.error('Failed to send schedule update notification', err);
-    }
-
-    await notifyCourseStudents({
-      courseId: updatedSchedule.course.id,
-      type: 'SCHEDULE_UPDATE',
-      message: `Schedule updated for ${updatedSchedule.course.name}`,
-      link: `/courses/${updatedSchedule.course.id}`
-    });
-
     // Emit schedule update event
-    socketEmitter.emit('schedule.updated', updatedSchedule);
+    socketEmitter.emit('schedule.updated', {
+      courseId: updatedSchedule.course.id,
+      courseName: updatedSchedule.course.name
+    });
 
     res.status(200).json({
       success: true,
@@ -575,11 +552,10 @@ const deleteSchedule = async (req, res, next) => {
       where: { id }
     });
 
-    await notifyCourseStudents({
+    // Emit schedule deletion event
+    socketEmitter.emit('schedule.deleted', {
       courseId: schedule.courseId,
-      type: 'SCHEDULE_REMOVED',
-      message: 'A schedule you were enrolled in has been removed',
-      link: `/courses/${schedule.courseId}`
+      courseName: schedule.course.name
     });
 
     res.status(200).json({

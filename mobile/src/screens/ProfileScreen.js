@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
+import { InfoCard } from '../components/cards/InfoCard';
 
 export const ProfileScreen = () => {
   const { user, logout } = useAuth();
@@ -23,19 +24,19 @@ export const ProfileScreen = () => {
       </View>
 
       <View className="px-6 mt-4">
-        <View className="bg-white rounded-2xl p-6 border border-slate-200">
-          <View className="flex-row items-center">
+        <View className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+          <View className="flex-row items-center mb-6">
             <View className="w-16 h-16 rounded-full bg-brand-500 items-center justify-center mr-4">
               <Text className="text-white text-2xl font-bold">
                 {user?.firstName?.[0] || ''}{user?.lastName?.[0] || ''}
               </Text>
             </View>
             <View>
-              <Text className="text-xl font-bold text-slate-800">{user?.name}</Text>
+              <Text className="text-xl font-bold text-slate-800">{user?.firstName} {user?.lastName}</Text>
               <Text className="text-slate-500">{user?.email}</Text>
             </View>
           </View>
-          <View className="mt-6 border-t border-slate-200 pt-4">
+          <View className="border-t border-slate-200 pt-4">
             <View className="flex-row justify-between py-2">
               <Text className="text-slate-500">Role</Text>
               <Text className="font-semibold text-slate-800">{getRoleDisplayName(user?.role)}</Text>

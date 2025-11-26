@@ -67,24 +67,12 @@ const createAnnouncement = async (req, res, next) => {
       }
     });
 
-    // Emit announcement creation event
-    socketEmitter.emit('announcement.created', announcement);
-
-    // Create notifications for targeted users
-    try {
-      await serviceRequest('notification-service', '/', {
-        method: 'POST',
-        data: {
-          type: 'NEW_ANNOUNCEMENT',
-          message: `New announcement: ${title}`,
-          link: `/announcements/${announcement.id}`,
-          targetAudience,
-          excludeUserId: req.user.id
-        }
-      });
-    } catch (err) {
-      console.error('Failed to send announcement notification', err);
-    }
+    // Emit announcement creation event with all necessary data for notification service
+    socketEmitter.emit('announcement.created', {
+      announcement,
+      targetAudience,
+      excludeUserId: req.user.id
+    });
 
     res.status(201).json({
       success: true,

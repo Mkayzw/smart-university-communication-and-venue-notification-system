@@ -20,7 +20,7 @@ export const Sidebar = () => {
     () => [
       { label: 'Overview', to: '/', icon: LayoutDashboard, roles: ['ADMIN', 'LECTURER', 'STUDENT'] },
       { label: 'Announcements', to: '/announcements', icon: Megaphone, roles: ['ADMIN', 'LECTURER', 'STUDENT'] },
-      { label: 'All Courses', to: '/courses', icon: School, roles: ['ADMIN', 'LECTURER', 'STUDENT'] },
+      { label: 'All Courses', to: '/courses', icon: School, roles: ['ADMIN'] },
       { label: 'My Courses', to: '/my-courses', icon: School, roles: ['LECTURER', 'STUDENT'] },
       { label: 'My Schedule', to: '/my-schedule', icon: CalendarClock, roles: ['LECTURER', 'STUDENT'] },
       { label: 'All Schedules', to: '/schedules', icon: CalendarRange, roles: ['ADMIN', 'LECTURER', 'STUDENT'] },

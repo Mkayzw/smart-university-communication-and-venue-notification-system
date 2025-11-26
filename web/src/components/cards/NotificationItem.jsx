@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom'
 
 const getNotificationIcon = (type) => {
   if (type?.includes('SCHEDULE')) return Calendar
-  if (type === 'NEW_ANNOUNCEMENT') return Bell
+  if (type?.includes('ANNOUNCEMENT')) return Bell
   return AlertCircle
 }
 
 const getNotificationColor = (type) => {
   if (type?.includes('SCHEDULE')) return 'text-blue-500'
-  if (type === 'NEW_ANNOUNCEMENT') return 'text-purple-500'
+  if (type?.includes('ANNOUNCEMENT')) return 'text-purple-500'
   return 'text-slate-500'
 }
 

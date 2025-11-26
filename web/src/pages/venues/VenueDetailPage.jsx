@@ -51,7 +51,7 @@ export const VenueDetailPage = () => {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-semibold text-slate-900">{venue.name}</h1>
-              <StatusPill tone={statusTone[venue.status]} label={venue.status} />
+              <StatusPill tone={statusTone[venue.status]}>{venue.status}</StatusPill>
             </div>
             <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
               <MapPin className="h-4 w-4" />

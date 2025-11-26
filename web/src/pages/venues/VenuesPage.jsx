@@ -13,7 +13,7 @@ export const VenuesPage = () => {
   const [filters, setFilters] = useState({ search: '', status: '' })
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  const venuesQuery = useApiQuery('/venues', { params: { limit: 20, page: 1 } })
+  const venuesQuery = useApiQuery('/venues/realtime', { params: { limit: 20, page: 1 } })
 
   const createMutation = useApiMutation('/venues', {
     method: 'POST',

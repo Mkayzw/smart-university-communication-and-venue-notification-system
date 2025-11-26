@@ -24,7 +24,7 @@ const ScheduleForm = ({ schedule, courses = [], onSubmit, onCancel, isLoading })
       startTime: formData.startTime,
       endTime: formData.endTime
     },
-    enabled: shouldFetchVenues,
+    enabled: shouldFetchVenues ? true : false,
     onError: () => {
       // If error, fall back to all venues
       allVenuesQuery.refetch();
@@ -34,7 +34,7 @@ const ScheduleForm = ({ schedule, courses = [], onSubmit, onCancel, isLoading })
   // Fallback: fetch all venues if no time is selected
   const allVenuesQuery = useApiQuery('/venues', {
     params: { limit: 100 },
-    enabled: !shouldFetchVenues
+    enabled: !shouldFetchVenues ? true : false
   });
 
   // Use available venues if we have time info, otherwise all venues

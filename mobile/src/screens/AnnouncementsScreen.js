@@ -1,22 +1,21 @@
 import React from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
+import { InfoCard } from '../components/cards/InfoCard';
+import { LoadingState } from '../components/common/LoadingState';
+import { ListEmptyState } from '../components/common/EmptyState';
 
 const AnnouncementCard = ({ item, onPress }) => (
-  <TouchableOpacity
+  <InfoCard
+    title={item.title}
+    subtitle={`${new Date(item.createdAt).toLocaleDateString()} • ${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}`}
+    icon="bell"
     onPress={onPress}
-    className="bg-white rounded-2xl border border-slate-200 p-4 mb-3 active:bg-slate-50"
-  >
-    <Text className="text-base font-semibold text-slate-900 mb-1">{item.title}</Text>
-    <Text className="text-sm text-slate-600 mb-2" numberOfLines={2}>{item.content}</Text>
-    <Text className="text-xs text-slate-400">
-      {new Date(item.createdAt).toLocaleDateString()}
-    </Text>
-  </TouchableOpacity>
+  />
 );
 
 export const AnnouncementsScreen = ({ navigation }) => {
@@ -30,16 +29,20 @@ export const AnnouncementsScreen = ({ navigation }) => {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <ActivityIndicator size="large" color="#14b8a6" />
+      <SafeAreaView className="flex-1 bg-slate-50">
+        <LoadingState fullScreen />
       </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-        <Text className="text-red-500">Error fetching announcements.</Text>
+      <SafeAreaView className="flex-1 bg-slate-50">
+        <ListEmptyState
+          icon="alert-circle"
+          message="Error fetching announcements. Please try again."
+          iconColor="#ef4444"
+        />
       </SafeAreaView>
     );
   }
@@ -53,9 +56,9 @@ export const AnnouncementsScreen = ({ navigation }) => {
         {isAdmin && (
           <TouchableOpacity
             onPress={() => navigation.navigate('CreateAnnouncement')}
-            className="bg-brand-500 p-2 rounded-full"
+            className="bg-brand-500 p-3 rounded-full shadow-sm"
           >
-            <Feather name="plus" size={24} color="white" />
+            <Feather name="plus" size={20} color="white" />
           </TouchableOpacity>
         )}
       </View>
@@ -70,9 +73,10 @@ export const AnnouncementsScreen = ({ navigation }) => {
         )}
         contentContainerStyle={{ paddingHorizontal: 16 }}
         ListEmptyComponent={
-          <View className="flex-1 items-center justify-center mt-20">
-            <Text className="text-slate-500">No announcements found.</Text>
-          </View>
+          <ListEmptyState
+            icon="bell"
+            message={isAdmin ? "No announcements found. Create your first announcement!" : "No announcements found."}
+          />
         }
       />
     </SafeAreaView>

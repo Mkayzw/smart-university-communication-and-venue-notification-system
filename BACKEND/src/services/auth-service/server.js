@@ -140,7 +140,7 @@ const login = async (req, res, next) => {
     console.log('[Auth Service] User found:', user ? 'Yes' : 'No');
 
     if (!user) {
-      return next(new AppError('Invalid credentials', 401));
+      return next(new AppError('No account found with this email address', 401));
     }
 
     // Check if password matches
@@ -152,7 +152,7 @@ const login = async (req, res, next) => {
     console.log('[Auth Service] Password match result:', isMatch);
 
     if (!isMatch) {
-      return next(new AppError('Invalid credentials', 401));
+      return next(new AppError('Incorrect password. Please check your password and try again.', 401));
     }
 
     // Generate token

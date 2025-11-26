@@ -1,59 +1,128 @@
 import React from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
+import { InfoCard, ActionCard } from '../components/cards/InfoCard';
+import { InlineLoader } from '../components/common/LoadingState';
 
-// Reusable Stat Card
-const StatCard = ({ icon, label, value, color }) => (
-  <View className={`bg-${color}-100 p-4 rounded-2xl flex-1 items-center`}>
-    <Feather name={icon} size={24} color={color === 'brand' ? '#14b8a6' : '#64748b'} />
-    <Text className="text-2xl font-bold text-slate-900 mt-2">{value ?? '-'}</Text>
-    <Text className="text-sm font-semibold text-slate-600">{label}</Text>
-  </View>
-);
+const { width } = Dimensions.get('window');
 
-// Admin Dashboard Component
+// Reusable Stat Card with improved styling
+const StatCard = ({ icon, label, value, color = 'brand' }) => {
+  const colorClasses = {
+    brand: 'bg-teal-50 border-teal-200',
+    blue: 'bg-blue-50 border-blue-200',
+    purple: 'bg-purple-50 border-purple-200',
+    green: 'bg-green-50 border-green-200',
+  };
+  
+  const iconColors = {
+    brand: '#14b8a6',
+    blue: '#3b82f6',
+    purple: '#a855f7',
+    green: '#10b981',
+  };
+
+  return (
+    <View className={`${colorClasses[color]} p-4 rounded-2xl flex-1 items-center border shadow-sm`}>
+      <View className="bg-white rounded-full p-3 mb-3 shadow-sm">
+        <Feather name={icon} size={20} color={iconColors[color]} />
+      </View>
+      <Text className="text-2xl font-bold text-slate-900">{value ?? '-'}</Text>
+      <Text className="text-sm font-medium text-slate-600 mt-1">{label}</Text>
+    </View>
+  );
+};
+
+// Admin Dashboard Component - redesigned to match user dashboard
 const AdminDashboard = ({ navigation, token }) => {
-  const { data, isLoading } = useQuery({
+  const {data: coursesData, isLoading: coursesLoading} = useQuery({
+      queryKey: ['all-courses'],
+      queryFn: () => apiFetch('/courses', {token, params: {limit: 3}}),
+      enabled: !!token,
+  })
+  const courses = coursesData?.data || [];
+
+  const {data: announcementsData, isLoading: announcementsLoading} = useQuery({
+      queryKey: ['announcements'],
+      queryFn: () => apiFetch('/announcements', {token, params: {limit: 3}}),
+      enabled: !!token,
+  })
+  const announcements = announcementsData?.data || [];
+
+  const { data, isLoading: statsLoading } = useQuery({
     queryKey: ['admin-stats'],
-    queryFn: () => apiFetch('/users/stats', { token }), // Assuming a stats endpoint exists
+    queryFn: () => apiFetch('/users/stats', { token }),
     enabled: !!token,
   });
 
   const stats = data?.data || {};
 
   return (
-    <View>
-      <View className="flex-row gap-x-4 mb-6">
-        <StatCard icon="users" label="Students" value={stats.students} color="brand" />
-        <StatCard icon="user-check" label="Lecturers" value={stats.lecturers} color="slate" />
+      <View>
+          {/* Quick Actions for Admin */}
+          <View className="mb-4">
+              <Text className="text-lg font-bold text-slate-900 mb-3">Quick Actions</Text>
+              <View className="flex-row flex-wrap gap-3">
+                  <TouchableOpacity onPress={() => navigation.navigate('CreateCourse')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                      <Feather name="plus-circle" size={20} color="#14b8a6" />
+                      <Text className="ml-3 text-sm font-semibold">Course</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('CreateVenue')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                      <Feather name="plus-circle" size={20} color="#14b8a6" />
+                      <Text className="ml-3 text-sm font-semibold">Venue</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('CreateSchedule')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                      <Feather name="plus-circle" size={20} color="#14b8a6" />
+                      <Text className="ml-3 text-sm font-semibold">Schedule</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => navigation.navigate('CreateAnnouncement')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                      <Feather name="plus-circle" size={20} color="#14b8a6" />
+                      <Text className="ml-3 text-sm font-semibold">Announcement</Text>
+                  </TouchableOpacity>
+              </View>
+          </View>
+
+          {/* Latest Announcements Section - same as user dashboard */}
+          <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-lg font-bold text-slate-900">Latest Announcements</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Announcements')}>
+                  <Text className="font-semibold text-brand-500">View All</Text>
+              </TouchableOpacity>
+          </View>
+          {announcementsLoading ? <InlineLoader /> : announcements.map(a => (
+               <InfoCard
+                   key={a.id}
+                   title={a.title}
+                   subtitle={a.content}
+                   icon="bell"
+                   onPress={() => navigation.navigate('AnnouncementDetail', { id: a.id })}
+               />
+          ))}
+
+          {/* Courses Section - same as user dashboard */}
+          <View className="flex-row justify-between items-center mt-4 mb-3">
+               <Text className="text-lg font-bold text-slate-900">Recent Courses</Text>
+               <TouchableOpacity onPress={() => navigation.navigate('Manage Courses')}>
+                  <Text className="font-semibold text-brand-500">View All</Text>
+               </TouchableOpacity>
+          </View>
+          {coursesLoading ? <InlineLoader /> : courses.map(c => {
+              const course = c.course || c;
+              return (
+                  <InfoCard
+                      key={course.id}
+                      title={course.name}
+                      subtitle={course.code}
+                      icon="book-open"
+                  />
+              );
+          })}
       </View>
-       <View className="flex-row gap-x-4 mb-6">
-        <StatCard icon="book-open" label="Courses" value={stats.courses} color="slate" />
-        <StatCard icon="map-pin" label="Venues" value={stats.venues} color="brand" />
-      </View>
-      <Text className="text-lg font-bold text-slate-900 mb-3">Quick Actions</Text>
-      <TouchableOpacity onPress={() => navigation.navigate('CreateCourse')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-          <Feather name="plus-circle" size={24} color="#14b8a6" />
-          <Text className="ml-4 text-base font-semibold">Create Course</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('CreateVenue')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-          <Feather name="plus-circle" size={24} color="#14b8a6" />
-          <Text className="ml-4 text-base font-semibold">Create Venue</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('CreateSchedule')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-          <Feather name="plus-circle" size={24} color="#14b8a6" />
-          <Text className="ml-4 text-base font-semibold">Create Schedule</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('CreateAnnouncement')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-          <Feather name="plus-circle" size={24} color="#14b8a6" />
-          <Text className="ml-4 text-base font-semibold">Create Announcement</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  )
 };
 
 // Student/Lecturer Dashboard Component
@@ -78,14 +147,16 @@ const UserDashboard = ({ navigation, token, isLecturer = false }) => {
             {isLecturer && (
                 <View className="mb-4">
                     <Text className="text-lg font-bold text-slate-900 mb-3">Quick Actions</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('CreateSchedule')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-                        <Feather name="calendar" size={24} color="#14b8a6" />
-                        <Text className="ml-4 text-base font-semibold">Create Schedule</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('CreateAnnouncement')} className="bg-white p-4 rounded-xl mb-3 flex-row items-center">
-                        <Feather name="bell" size={24} color="#14b8a6" />
-                        <Text className="ml-4 text-base font-semibold">Create Announcement</Text>
-                    </TouchableOpacity>
+                    <View className="flex-row flex-wrap gap-3">
+                        <TouchableOpacity onPress={() => navigation.navigate('CreateSchedule')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                            <Feather name="calendar" size={20} color="#14b8a6" />
+                            <Text className="ml-3 text-sm font-semibold">Schedule</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => navigation.navigate('CreateAnnouncement')} className="bg-white p-3 rounded-xl flex-row items-center flex-1 min-w-[45%] border border-slate-200">
+                            <Feather name="bell" size={20} color="#14b8a6" />
+                            <Text className="ml-3 text-sm font-semibold">Announcement</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             )}
 
@@ -95,26 +166,31 @@ const UserDashboard = ({ navigation, token, isLecturer = false }) => {
                     <Text className="font-semibold text-brand-500">View All</Text>
                 </TouchableOpacity>
             </View>
-            {announcementsLoading ? <ActivityIndicator/> : announcements.map(a => (
-                 <TouchableOpacity key={a.id} onPress={() => navigation.navigate('AnnouncementDetail', { id: a.id })} className="bg-white p-4 rounded-xl mb-3">
-                    <Text className="font-bold text-slate-800">{a.title}</Text>
-                    <Text className="text-slate-600 mt-1" numberOfLines={2}>{a.content}</Text>
-                </TouchableOpacity>
+            {announcementsLoading ? <InlineLoader /> : announcements.map(a => (
+                 <InfoCard
+                     key={a.id}
+                     title={a.title}
+                     subtitle={a.content}
+                     icon="bell"
+                     onPress={() => navigation.navigate('AnnouncementDetail', { id: a.id })}
+                 />
             ))}
 
             <View className="flex-row justify-between items-center mt-4 mb-3">
                  <Text className="text-lg font-bold text-slate-900">My Courses</Text>
                  <TouchableOpacity onPress={() => navigation.navigate('My Courses')}>
                     <Text className="font-semibold text-brand-500">View All</Text>
-                </TouchableOpacity>
+                 </TouchableOpacity>
             </View>
-            {coursesLoading ? <ActivityIndicator/> : courses.map(c => {
+            {coursesLoading ? <InlineLoader /> : courses.map(c => {
                 const course = c.course || c;
                 return (
-                    <View key={course.id} className="bg-white p-4 rounded-xl mb-3">
-                        <Text className="font-bold">{course.name}</Text>
-                        <Text className="text-slate-600">{course.code}</Text>
-                    </View>
+                    <InfoCard
+                        key={course.id}
+                        title={course.name}
+                        subtitle={course.code}
+                        icon="book-open"
+                    />
                 );
             })}
         </View>
@@ -156,22 +232,53 @@ export const DashboardScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50">
-      {/* Custom Header */}
-      <View className="flex-row justify-between items-center px-4 pt-4 pb-3 bg-slate-50">
-        <View>
-          <Text className="text-sm text-slate-500">Welcome, {user.role.toLowerCase()}</Text>
-          <Text className="text-xl font-bold text-slate-900">{user.firstName} {user.lastName}</Text>
+      {/* Improved Header with better spacing and layout */}
+      <View className="px-4 pt-4 pb-2">
+        <View className="flex-row justify-between items-center">
+          <View className="flex-1">
+            <Text className="text-sm text-slate-500 mb-1">Welcome back</Text>
+            <Text className="text-2xl font-bold text-slate-900">{user.firstName} {user.lastName}</Text>
+            <Text className="text-sm text-slate-500 mt-1">{user.role.toLowerCase()}</Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="relative bg-white p-3 rounded-full border border-slate-200 shadow-sm">
+            <Feather name="bell" size={20} color="#334155" />
+            {unreadCount > 0 && (
+              <View className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2 border-white">
+                <Text className="text-white text-xs font-bold">{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Notifications')} className="relative">
-          <Feather name="bell" size={28} color="#334155" />
-          {unreadCount > 0 && (
-            <View className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2 border-slate-50">
-              <Text className="text-white text-xs font-bold">{unreadCount}</Text>
+      </View>
+      
+      {/* Improved Notifications Card */}
+      <View className="px-4 pb-4">
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Notifications')}
+          className="bg-white rounded-xl p-4 flex-row items-center justify-between border border-slate-200 shadow-sm"
+        >
+          <View className="flex-row items-center flex-1">
+            <View className="bg-teal-50 p-2 rounded-lg mr-3">
+              <Feather name="bell" size={18} color="#14b8a6" />
             </View>
+            <View className="flex-1">
+              <Text className="text-base font-semibold text-slate-900">Notifications</Text>
+              {unreadCount > 0 && (
+                <Text className="text-sm text-slate-500">{unreadCount} unread</Text>
+              )}
+            </View>
+          </View>
+          {unreadCount > 0 ? (
+            <View className="bg-red-500 rounded-full px-2 py-1 min-w-[24px] items-center justify-center">
+              <Text className="text-white text-xs font-bold">{unreadCount > 9 ? '9+' : unreadCount.toString()}</Text>
+            </View>
+          ) : (
+            <Feather name="chevron-right" size={16} color="#94a3b8" />
           )}
         </TouchableOpacity>
       </View>
-      <ScrollView className="px-4">
+      
+      <ScrollView className="px-4" showsVerticalScrollIndicator={false}>
         {renderRoleDashboard()}
       </ScrollView>
     </SafeAreaView>

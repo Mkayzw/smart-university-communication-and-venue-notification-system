@@ -16,6 +16,7 @@ export const CreateScheduleScreen = ({ navigation }) => {
   const [courseValue, setCourseValue] = useState(null);
   const [venueOpen, setVenueOpen] = useState(false);
   const [venueValue, setVenueValue] = useState(null);
+  const [dayOpen, setDayOpen] = useState(false);
   
   const [form, setForm] = useState({
     dayOfWeek: '',
@@ -25,26 +26,28 @@ export const CreateScheduleScreen = ({ navigation }) => {
   });
 
   const { data: coursesData, isLoading: coursesLoading } = useQuery({
-    queryKey: ['all-courses-list'],
-    queryFn: () => apiFetch('/courses', { token, params: { limit: 1000 } }),
+    queryKey: ['my-courses-list'],
+    queryFn: () => apiFetch('/courses/my', { token, params: { limit: 1000 } }),
     enabled: !!token,
   });
 
   // Check if we have enough info to fetch available venues
-  const canFetchAvailableVenues = form.dayOfWeek && form.startTime && form.endTime;
+  const canFetchAvailableVenues = useMemo(() =>
+    !!(form.dayOfWeek && form.startTime && form.endTime), [form.dayOfWeek, form.startTime, form.endTime]
+  );
   
   // Fetch available venues when day and time are selected
   const { data: availableVenuesData, isLoading: availableVenuesLoading } = useQuery({
     queryKey: ['available-venues', form.dayOfWeek, form.startTime, form.endTime],
-    queryFn: () => apiFetch('/venues/available', { 
-      token, 
-      params: { 
+    queryFn: () => apiFetch('/venues/available', {
+      token,
+      params: {
         dayOfWeek: form.dayOfWeek,
         startTime: form.startTime,
         endTime: form.endTime
-      } 
+      }
     }),
-    enabled: !!token && canFetchAvailableVenues,
+    enabled: !!token && !!canFetchAvailableVenues,
   });
 
   // Fallback: fetch all venues if no time is selected
@@ -232,20 +235,45 @@ export const CreateScheduleScreen = ({ navigation }) => {
             )}
           </View>
           <View style={{ zIndex: 1000 }}>
-            <Text className="text-sm font-semibold text-slate-700 mb-1">Day of the Week</Text>
-            <DropDownPicker items={dayItems} value={form.dayOfWeek} onSelectItem={(item) => handleInputChange('dayOfWeek', item.value)} listMode="MODAL" />
+            <Text className="text-sm font-semibold text-slate-700 mb-1">Day of Week <Text className="text-red-500">*</Text></Text>
+            <DropDownPicker
+              open={dayOpen}
+              value={form.dayOfWeek}
+              items={dayItems}
+              setOpen={setDayOpen}
+              setValue={(callback) => {
+                const value = callback(form.dayOfWeek);
+                handleInputChange('dayOfWeek', value);
+              }}
+              listMode="MODAL"
+            />
           </View>
           <View>
-            <Text className="text-sm font-semibold text-slate-700 mb-1">Start Time (HH:MM)</Text>
-            <TextInput value={form.startTime} onChangeText={v => handleInputChange('startTime', v)} placeholder="e.g., 09:00" className="bg-white rounded-xl border border-slate-300 p-3" />
+            <Text className="text-sm font-semibold text-slate-700 mb-1">Start Time <Text className="text-red-500">*</Text></Text>
+            <TextInput
+              value={form.startTime}
+              onChangeText={v => handleInputChange('startTime', v)}
+              placeholder="e.g., 09:00"
+              className="bg-white rounded-xl border border-slate-300 p-3"
+            />
           </View>
           <View>
-            <Text className="text-sm font-semibold text-slate-700 mb-1">End Time (HH:MM)</Text>
-            <TextInput value={form.endTime} onChangeText={v => handleInputChange('endTime', v)} placeholder="e.g., 11:00" className="bg-white rounded-xl border border-slate-300 p-3" />
+            <Text className="text-sm font-semibold text-slate-700 mb-1">End Time <Text className="text-red-500">*</Text></Text>
+            <TextInput
+              value={form.endTime}
+              onChangeText={v => handleInputChange('endTime', v)}
+              placeholder="e.g., 11:00"
+              className="bg-white rounded-xl border border-slate-300 p-3"
+            />
           </View>
           <View>
-            <Text className="text-sm font-semibold text-slate-700 mb-1">Semester</Text>
-            <TextInput value={form.semester} onChangeText={v => handleInputChange('semester', v)} placeholder="e.g., Fall 2025" className="bg-white rounded-xl border border-slate-300 p-3" />
+            <Text className="text-sm font-semibold text-slate-700 mb-1">Semester <Text className="text-red-500">*</Text></Text>
+            <TextInput
+              value={form.semester}
+              onChangeText={v => handleInputChange('semester', v)}
+              placeholder="e.g., 2025 Semester 1"
+              className="bg-white rounded-xl border border-slate-300 p-3"
+            />
           </View>
         </View>
 
