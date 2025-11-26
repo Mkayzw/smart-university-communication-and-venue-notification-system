@@ -1370,7 +1370,7 @@ app.get('/api/venues/available', authenticate, async (req, res, next) => {
   try {
     const { dayOfWeek, startTime, endTime } = req.query;
 
-    const where = { isAvailable: true };
+    const where = { status: 'AVAILABLE' };
 
     // If time parameters are provided, check for conflicts
     if (dayOfWeek && startTime && endTime) {
@@ -1406,7 +1406,7 @@ app.get('/api/venues/available', authenticate, async (req, res, next) => {
       where,
       orderBy: [
         { building: 'asc' },
-        { roomNumber: 'asc' }
+        { name: 'asc' }
       ]
     });
 
@@ -1426,7 +1426,7 @@ app.get('/api/venues', authenticate, async (req, res, next) => {
     
     const where = {};
     if (building) where.building = building;
-    if (available !== undefined) where.isAvailable = available === 'true';
+    if (available !== undefined) where.status = available === 'true' ? 'AVAILABLE' : 'OCCUPIED';
 
     // Add pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1450,7 +1450,7 @@ app.get('/api/venues', authenticate, async (req, res, next) => {
       },
       orderBy: [
         { building: 'asc' },
-        { roomNumber: 'asc' }
+        { name: 'asc' }
       ]
     });
 
@@ -1514,19 +1514,17 @@ app.get('/api/venues/:id', authenticate, async (req, res, next) => {
 // Create venue (Admin only)
 app.post('/api/venues', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
-    const { name, building, roomNumber, capacity, type, facilities } = req.body;
+    const { name, building, capacity, facilities } = req.body;
 
-    validateRequired(['name', 'building', 'roomNumber', 'capacity'], req.body);
+    validateRequired(['name', 'building', 'capacity'], req.body);
 
     const venue = await prisma.venue.create({
       data: {
         name,
         building,
-        roomNumber,
         capacity,
-        type: type || 'LECTURE_HALL',
         facilities: facilities || [],
-        isAvailable: true
+        status: 'AVAILABLE'
       }
     });
 
@@ -1546,16 +1544,14 @@ app.post('/api/venues', authenticate, authorize('ADMIN'), async (req, res, next)
 app.put('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, building, roomNumber, capacity, type, facilities } = req.body;
+    const { name, building, capacity, facilities } = req.body;
 
     const venue = await prisma.venue.update({
       where: { id },
       data: {
         name,
         building,
-        roomNumber,
         capacity,
-        type,
         facilities
       }
     });
@@ -1576,11 +1572,16 @@ app.put('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res, ne
 app.patch('/api/venues/:id/availability', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { isAvailable } = req.body;
+    const { status } = req.body;
+
+    // Validate status
+    if (!['AVAILABLE', 'OCCUPIED', 'MAINTENANCE'].includes(status)) {
+      return next(new AppError('Invalid status. Must be AVAILABLE, OCCUPIED, or MAINTENANCE', 400));
+    }
 
     const venue = await prisma.venue.update({
       where: { id },
-      data: { isAvailable }
+      data: { status }
     });
 
     // Emit socket event

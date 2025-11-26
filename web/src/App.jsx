@@ -15,6 +15,8 @@ import { ProfilePage } from './pages/profile/ProfilePage.jsx'
 import { CourseDetailPage } from './pages/courses/CourseDetailPage.jsx'
 import { AnnouncementDetailPage } from './pages/announcements/AnnouncementDetailPage.jsx'
 import { SplashScreen } from './components/feedback/SplashScreen.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { ErrorProvider } from './providers/ErrorProvider.jsx'
 
 const ProtectedRoute = ({ roles }) => {
   const { isAuthenticated, isLoading, user } = useAuth()
@@ -50,33 +52,37 @@ const PublicOnlyRoute = () => {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<PublicOnlyRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-        </Route>
-
-        <Route element={<ProtectedRoute />}>
-          <Route element={<DashboardLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="announcements" element={<AnnouncementsPage />} />
-            <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
-            <Route path="courses" element={<CoursesPage />} />
-            <Route path="courses/:id" element={<CourseDetailPage />} />
-            <Route path="my-courses" element={<MyCoursesPage />} />
-            <Route path="schedules" element={<SchedulesPage />} />
-            <Route path="my-schedule" element={<MySchedulePage />} />
-            <Route element={<ProtectedRoute roles={["ADMIN", "LECTURER"]} />}>
-              <Route path="venues" element={<VenuesPage />} />
-              <Route path="venues/:id" element={<VenueDetailPage />} />
+    <ErrorBoundary>
+      <ErrorProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<PublicOnlyRoute />}>
+              <Route path="/login" element={<LoginPage />} />
             </Route>
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="profile" element={<ProfilePage />} />
-          </Route>
-        </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+            <Route element={<ProtectedRoute />}>
+              <Route element={<DashboardLayout />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="announcements" element={<AnnouncementsPage />} />
+                <Route path="announcements/:id" element={<AnnouncementDetailPage />} />
+                <Route path="courses" element={<CoursesPage />} />
+                <Route path="courses/:id" element={<CourseDetailPage />} />
+                <Route path="my-courses" element={<MyCoursesPage />} />
+                <Route path="schedules" element={<SchedulesPage />} />
+                <Route path="my-schedule" element={<MySchedulePage />} />
+                <Route element={<ProtectedRoute roles={["ADMIN", "LECTURER"]} />}>
+                  <Route path="venues" element={<VenuesPage />} />
+                  <Route path="venues/:id" element={<VenueDetailPage />} />
+                </Route>
+                <Route path="notifications" element={<NotificationsPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ErrorProvider>
+    </ErrorBoundary>
   )
 }
