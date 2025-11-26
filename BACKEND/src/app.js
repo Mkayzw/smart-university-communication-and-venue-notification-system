@@ -825,11 +825,11 @@ app.get('/api/courses/:id/students', authenticate, authorize('LECTURER', 'ADMIN'
 // Get all announcements
 app.get('/api/announcements', authenticate, async (req, res, next) => {
   try {
-    const { category, priority } = req.query;
+    const { targetAudience, pinned } = req.query;
     
     const where = {};
-    if (category) where.category = category;
-    if (priority) where.priority = priority;
+    if (targetAudience) where.targetAudience = targetAudience;
+    if (pinned !== undefined) where.pinned = pinned === 'true';
 
     const announcements = await prisma.announcement.findMany({
       where,
@@ -910,17 +910,16 @@ app.get('/api/announcements/:id', authenticate, async (req, res, next) => {
 // Create announcement (Lecturer/Admin only)
 app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
-    const { title, content, category, priority, targetAudience } = req.body;
+    const { title, content, targetAudience, pinned } = req.body;
 
-    validateRequired(['title', 'content', 'category'], req.body);
+    validateRequired(['title', 'content'], req.body);
 
     const announcement = await prisma.announcement.create({
       data: {
         title,
         content,
-        category,
-        priority: priority || 'MEDIUM',
-        targetAudience,
+        targetAudience: targetAudience || 'ALL',
+        pinned: pinned || false,
         authorId: req.user.id
       },
       include: {
@@ -973,8 +972,8 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
       // Don't fail the request if notification fails
     }
 
-    // Send push notifications
-    if (priority === 'HIGH' || priority === 'URGENT') {
+    // Send push notifications for pinned announcements
+    if (announcement.pinned) {
       const users = await prisma.user.findMany({
         where: {
           pushToken: {
@@ -1021,7 +1020,7 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
 app.put('/api/announcements/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, content, category, priority, targetAudience } = req.body;
+    const { title, content, targetAudience, pinned } = req.body;
 
     // Check if user owns the announcement or is admin
     const announcement = await prisma.announcement.findUnique({
@@ -1037,15 +1036,15 @@ app.put('/api/announcements/:id', authenticate, async (req, res, next) => {
       return next(new AppError('Not authorized to update this announcement', 403));
     }
 
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (content !== undefined) updateData.content = content;
+    if (targetAudience !== undefined) updateData.targetAudience = targetAudience;
+    if (pinned !== undefined) updateData.pinned = pinned;
+
     const updatedAnnouncement = await prisma.announcement.update({
       where: { id },
-      data: {
-        title,
-        content,
-        category,
-        priority,
-        targetAudience
-      },
+      data: updateData,
       include: {
         author: {
           select: {
