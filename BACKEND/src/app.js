@@ -261,23 +261,65 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 // Get all users (Admin only)
 app.get('/api/users', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        department: true,
-        studentId: true,
-        staffId: true,
-        createdAt: true
-      }
-    });
+    const { role, department, search, page = 1, limit = 20 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    // Build where clause
+    const where = {};
+    
+    if (role) {
+      where.role = role;
+    }
+    
+    if (department) {
+      where.department = department;
+    }
+    
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { studentId: { contains: search, mode: 'insensitive' } },
+        { staffId: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          department: true,
+          studentId: true,
+          staffId: true,
+          createdAt: true
+        },
+        orderBy: [
+          { lastName: 'asc' },
+          { firstName: 'asc' }
+        ]
+      }),
+      prisma.user.count({ where })
+    ]);
 
     res.status(200).json({
       success: true,
-      data: users
+      data: users,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     next(error);
@@ -346,13 +388,33 @@ app.delete('/api/users/:id', authenticate, authorize('ADMIN'), async (req, res, 
 // Get all courses
 app.get('/api/courses', authenticate, async (req, res, next) => {
   try {
-    const { page = 1, limit = 12 } = req.query;
+    const { page = 1, limit = 12, search, department, lecturerId } = req.query;
+    
+    // Build where clause
+    const where = {};
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (department) {
+      where.department = department;
+    }
+    
+    if (lecturerId) {
+      where.lecturerId = lecturerId;
+    }
     
     // Add pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
     const courses = await prisma.course.findMany({
+      where,
       skip,
       take,
       include: {
@@ -375,11 +437,12 @@ app.get('/api/courses', authenticate, async (req, res, next) => {
             }
           }
         }
-      }
+      },
+      orderBy: { name: 'asc' }
     });
 
     // Get total count for pagination
-    const total = await prisma.course.count();
+    const total = await prisma.course.count({ where });
 
     res.status(200).json({
       success: true,

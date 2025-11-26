@@ -180,100 +180,12 @@ export const CoursesPage = () => {
             </>
           }
         >
-          <form id="create-course-form" className="space-y-4" onSubmit={handleCreateSubmit}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-600" htmlFor="course-code">
-                  Course code
-                </label>
-                <input
-                  id="course-code"
-                  name="code"
-                  className="w-full rounded-2xl border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                  value={createForm.code}
-                  onChange={AdminCourseForm}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-600" htmlFor="course-department">
-                  Department
-                </label>
-                <input
-                  id="course-department"
-                  name="department"
-                  className="w-full rounded-2xl border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                  value={createForm.department}
-                  onChange={AdminCourseForm}
-                  placeholder="e.g. Computer Science"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-600" htmlFor="course-name">
-                Course name
-              </label>
-              <input
-                id="course-name"
-                name="name"
-                className="w-full rounded-2xl border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                value={createForm.name}
-                onChange={AdminCourseForm}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-600" htmlFor="course-description">
-                Description
-              </label>
-              <textarea
-                id="course-description"
-                name="description"
-                className="h-28 w-full resize-none rounded-2xl border border-border/70 bg-white/80 px-4 py-3 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                value={createForm.description}
-                onChange={AdminCourseForm}
-                placeholder="What’s this course about?"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-600" htmlFor="course-credits">
-                  Credits
-                </label>
-                <input
-                  id="course-credits"
-                  name="credits"
-                  type="number"
-                  min="0"
-                  className="w-full rounded-2xl border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                  value={createForm.credits}
-                  onChange={AdminCourseForm}
-                />
-              </div>
-              {user?.role === 'ADMIN' ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-600" htmlFor="course-lecturer">
-                    Lecturer ID (optional)
-                  </label>
-                  <input
-                    id="course-lecturer"
-                    name="lecturerId"
-                    className="w-full rounded-2xl border border-border/70 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 shadow-inner outline-none"
-                    value={createForm.lecturerId}
-                    onChange={AdminCourseForm}
-                    placeholder="Assign lecturer"
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            {createError ? (
-              <div className="rounded-2xl border border-accent-400/60 bg-accent-100/80 px-4 py-3 text-sm font-semibold text-accent-700">
-                {createError}
-              </div>
-            ) : null}
-          </form>
+          <AdminCourseForm
+            formData={createForm}
+            setFormData={setCreateForm}
+            onSubmit={handleCreateSubmit}
+            error={createError}
+          />
         </Modal>
       ) : null}
     </div>
