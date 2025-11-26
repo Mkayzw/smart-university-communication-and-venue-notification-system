@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useApiQuery } from '../../hooks/useApi';
 
 const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
-const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel, isLoading }) => {
+const ScheduleForm = ({ schedule, courses = [], onSubmit, onCancel, isLoading }) => {
   const [formData, setFormData] = useState({
     courseId: '',
     venueId: '',
@@ -13,6 +14,35 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
   });
 
   const [errors, setErrors] = useState({});
+
+  // Fetch available venues based on selected day and time
+  const shouldFetchVenues = formData.dayOfWeek && formData.startTime && formData.endTime;
+  
+  const availableVenuesQuery = useApiQuery('/venues/available', {
+    params: {
+      dayOfWeek: formData.dayOfWeek,
+      startTime: formData.startTime,
+      endTime: formData.endTime
+    },
+    enabled: shouldFetchVenues,
+    onError: () => {
+      // If error, fall back to all venues
+      allVenuesQuery.refetch();
+    }
+  });
+
+  // Fallback: fetch all venues if no time is selected
+  const allVenuesQuery = useApiQuery('/venues', {
+    params: { limit: 100 },
+    enabled: !shouldFetchVenues
+  });
+
+  // Use available venues if we have time info, otherwise all venues
+  const venues = shouldFetchVenues 
+    ? (availableVenuesQuery.data?.data || [])
+    : (allVenuesQuery.data?.data || []);
+
+  const isLoadingVenues = shouldFetchVenues ? availableVenuesQuery.isLoading : allVenuesQuery.isLoading;
 
   useEffect(() => {
     if (schedule) {
@@ -25,7 +55,6 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
         semester: schedule.semester || '2025 Semester 1'
       });
     } else if (courses.length === 1) {
-      // Pre-select course if only one is provided (e.g., from course detail page)
       setFormData((prev) => ({
         ...prev,
         courseId: courses[0].id
@@ -33,12 +62,28 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
     }
   }, [schedule, courses]);
 
+  // Reset venue selection when time changes
+  useEffect(() => {
+    if (shouldFetchVenues && formData.venueId) {
+      // Check if currently selected venue is still available
+      const isStillAvailable = venues.some(v => v.id === formData.venueId);
+      if (!isStillAvailable) {
+        setFormData(prev => ({ ...prev, venueId: '' }));
+        setErrors(prev => ({ 
+          ...prev, 
+          venueId: 'Previously selected venue is not available for this time' 
+        }));
+      }
+    }
+  }, [venues, formData.venueId, shouldFetchVenues]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value
     }));
+    
     // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
@@ -78,6 +123,7 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Course Selection */}
       <div>
         <label htmlFor="courseId" className="block text-sm font-medium text-gray-700 mb-1">
           Course <span className="text-red-500">*</span>
@@ -100,32 +146,9 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
           ))}
         </select>
         {errors.courseId && <p className="text-red-500 text-sm mt-1">{errors.courseId}</p>}
-        {courses.length === 1 && <p className="text-sm text-gray-500 mt-1">Course is pre-selected</p>}
       </div>
 
-      <div>
-        <label htmlFor="venueId" className="block text-sm font-medium text-gray-700 mb-1">
-          Venue <span className="text-red-500">*</span>
-        </label>
-        <select
-          id="venueId"
-          name="venueId"
-          value={formData.venueId}
-          onChange={handleChange}
-          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors.venueId ? 'border-red-500' : 'border-gray-300'
-          }`}
-        >
-          <option value="">Select a venue</option>
-          {venues.map((venue) => (
-            <option key={venue.id} value={venue.id}>
-              {venue.name} ({venue.building}) - Capacity: {venue.capacity}
-            </option>
-          ))}
-        </select>
-        {errors.venueId && <p className="text-red-500 text-sm mt-1">{errors.venueId}</p>}
-      </div>
-
+      {/* Day of Week */}
       <div>
         <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700 mb-1">
           Day of Week <span className="text-red-500">*</span>
@@ -145,6 +168,7 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
         </select>
       </div>
 
+      {/* Time Selection */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-1">
@@ -181,6 +205,58 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
         </div>
       </div>
 
+      {/* Venue Selection - NOW SHOWS ONLY AVAILABLE VENUES! */}
+      <div>
+        <label htmlFor="venueId" className="block text-sm font-medium text-gray-700 mb-1">
+          Venue <span className="text-red-500">*</span>
+          {shouldFetchVenues && (
+            <span className="text-sm text-green-600 ml-2">
+              (Showing only available venues for selected time)
+            </span>
+          )}
+        </label>
+        
+        {!shouldFetchVenues && (
+          <p className="text-sm text-amber-600 mb-2">
+            ⚠️ Select day and time first to see available venues
+          </p>
+        )}
+
+        <select
+          id="venueId"
+          name="venueId"
+          value={formData.venueId}
+          onChange={handleChange}
+          disabled={isLoadingVenues}
+          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors.venueId ? 'border-red-500' : 'border-gray-300'
+          } ${isLoadingVenues ? 'bg-gray-100' : ''}`}
+        >
+          <option value="">
+            {isLoadingVenues 
+              ? 'Loading available venues...' 
+              : venues.length === 0 
+                ? 'No venues available for this time'
+                : 'Select a venue'
+            }
+          </option>
+          {venues.map((venue) => (
+            <option key={venue.id} value={venue.id}>
+              {venue.name} ({venue.building}) - Capacity: {venue.capacity}
+              {venue.status === 'MAINTENANCE' && ' [Under Maintenance]'}
+            </option>
+          ))}
+        </select>
+        {errors.venueId && <p className="text-red-500 text-sm mt-1">{errors.venueId}</p>}
+        
+        {shouldFetchVenues && venues.length === 0 && !isLoadingVenues && (
+          <p className="text-red-500 text-sm mt-1">
+            No venues are available for the selected time. Please choose a different time slot.
+          </p>
+        )}
+      </div>
+
+      {/* Semester */}
       <div>
         <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-1">
           Semester <span className="text-red-500">*</span>
@@ -199,6 +275,7 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
         {errors.semester && <p className="text-red-500 text-sm mt-1">{errors.semester}</p>}
       </div>
 
+      {/* Form Actions */}
       <div className="flex justify-end gap-3 pt-4">
         <button
           type="button"
@@ -210,8 +287,8 @@ const ScheduleForm = ({ schedule, courses = [], venues = [], onSubmit, onCancel,
         </button>
         <button
           type="submit"
-          disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+          disabled={isLoading || (shouldFetchVenues && venues.length === 0)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {isLoading && (
             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

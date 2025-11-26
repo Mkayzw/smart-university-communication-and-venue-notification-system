@@ -1,7 +1,7 @@
 import React from 'react'
-import { View, Text, TouchableOpacity } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { getErrorSeverity, getErrorAction } from '../utils/errorHandler'
+import { getErrorSeverity, getErrorAction, getErrorMessage } from '../utils/errorHandler'
 
 export const ErrorAlert = ({ 
   error, 
@@ -11,38 +11,42 @@ export const ErrorAlert = ({
   showIcon = true,
   dismissible = true,
   actionButton = true,
-  className = ''
+  style = {}
 }) => {
   if (!error && !message) return null
   
   const severity = getErrorSeverity(error)
   const action = actionButton ? getErrorAction(error) : null
-  const displayMessage = message || error?.message || 'An error occurred'
+  const displayMessage = message || getErrorMessage(error) || 'An error occurred'
   
   const severityStyles = {
     info: {
-      container: 'bg-blue-50 border-blue-200',
-      text: 'text-blue-800',
-      icon: '#3B82F6',
-      button: 'bg-blue-100'
+      backgroundColor: '#DBEAFE',
+      borderColor: '#93C5FD',
+      textColor: '#1E40AF',
+      iconColor: '#3B82F6',
+      buttonColor: '#BFDBFE'
     },
     warning: {
-      container: 'bg-amber-50 border-amber-200',
-      text: 'text-amber-800',
-      icon: '#F59E0B',
-      button: 'bg-amber-100'
+      backgroundColor: '#FEF3C7',
+      borderColor: '#FDE68A',
+      textColor: '#92400E',
+      iconColor: '#F59E0B',
+      buttonColor: '#FDE68A'
     },
     error: {
-      container: 'bg-red-50 border-red-200',
-      text: 'text-red-800',
-      icon: '#EF4444',
-      button: 'bg-red-100'
+      backgroundColor: '#FEE2E2',
+      borderColor: '#FECACA',
+      textColor: '#991B1B',
+      iconColor: '#EF4444',
+      buttonColor: '#FECACA'
     },
     critical: {
-      container: 'bg-red-100 border-red-300',
-      text: 'text-red-900',
-      icon: '#DC2626',
-      button: 'bg-red-200'
+      backgroundColor: '#FEE2E2',
+      borderColor: '#FCA5A5',
+      textColor: '#7F1D1D',
+      iconColor: '#DC2626',
+      buttonColor: '#FCA5A5'
     }
   }
   
@@ -67,29 +71,41 @@ export const ErrorAlert = ({
   }
   
   return (
-    <View className={`rounded-lg border p-4 ${styles.container} ${className}`}>
-      <View className="flex-row">
+    <View 
+      style={[
+        alertStyles.container,
+        {
+          backgroundColor: styles.backgroundColor,
+          borderColor: styles.borderColor,
+        },
+        style
+      ]}
+    >
+      <View style={alertStyles.content}>
         {showIcon && (
-          <View className="mr-3">
+          <View style={alertStyles.iconContainer}>
             <Ionicons 
               name={getIconName()} 
               size={24} 
-              color={styles.icon}
+              color={styles.iconColor}
             />
           </View>
         )}
         
-        <View className="flex-1">
-          <Text className={`text-sm font-medium ${styles.text}`}>
+        <View style={alertStyles.textContainer}>
+          <Text style={[alertStyles.text, { color: styles.textColor }]}>
             {displayMessage}
           </Text>
           
           {action && onAction && (
             <TouchableOpacity
               onPress={handleAction}
-              className={`mt-2 px-3 py-1 rounded-md self-start ${styles.button}`}
+              style={[
+                alertStyles.button,
+                { backgroundColor: styles.buttonColor }
+              ]}
             >
-              <Text className={`text-sm font-semibold ${styles.text}`}>
+              <Text style={[alertStyles.buttonText, { color: styles.textColor }]}>
                 {action.text}
               </Text>
             </TouchableOpacity>
@@ -99,12 +115,12 @@ export const ErrorAlert = ({
         {dismissible && onDismiss && (
           <TouchableOpacity
             onPress={onDismiss}
-            className="ml-4"
+            style={alertStyles.dismissButton}
           >
             <Ionicons 
               name="close" 
               size={20} 
-              color={styles.icon}
+              color={styles.iconColor}
             />
           </TouchableOpacity>
         )}
@@ -112,3 +128,43 @@ export const ErrorAlert = ({
     </View>
   )
 }
+
+const alertStyles = StyleSheet.create({
+  container: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 16,
+    marginVertical: 8,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  iconContainer: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  text: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  button: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  buttonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dismissButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+})

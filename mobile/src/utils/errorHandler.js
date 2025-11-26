@@ -1,14 +1,35 @@
+// Extract error message from backend response
+const extractErrorMessage = (error) => {
+  if (!error) return null
+  
+  // Try to get message from different possible locations
+  if (error.message) return error.message
+  if (error.error) return error.error
+  if (error.data?.error) return error.data.error
+  if (error.data?.message) return error.data.message
+  if (error.response?.data?.error) return error.response.data.error
+  if (error.response?.data?.message) return error.response.data.message
+  
+  return null
+}
+
 // Error message mapping for user-friendly display
 export const getErrorMessage = (error) => {
   // Handle different error types
   if (!error) return 'An unexpected error occurred'
   
+  const errorMessage = extractErrorMessage(error) || ''
+  const lowerMessage = errorMessage.toLowerCase()
+  
   // Network/Connection errors
-  if (error.message === 'Network request failed' || error.message === 'Failed to fetch') {
+  if (errorMessage === 'Network request failed' || 
+      errorMessage === 'Failed to fetch' ||
+      errorMessage.includes('NetworkError') ||
+      errorMessage.includes('network')) {
     return 'Unable to connect to the server. Please check your internet connection.'
   }
   
-  if (error.isTimeout) {
+  if (error.isTimeout || errorMessage.includes('timeout')) {
     return 'Request timed out. The server is taking too long to respond.'
   }
   
@@ -17,52 +38,79 @@ export const getErrorMessage = (error) => {
     switch (error.status) {
       case 400:
         // Bad request - check for specific error messages
-        if (error.message?.toLowerCase().includes('password')) {
+        if (lowerMessage.includes('password')) {
           return 'Invalid password. Please check your password and try again.'
         }
-        if (error.message?.toLowerCase().includes('email')) {
+        if (lowerMessage.includes('email')) {
+          if (lowerMessage.includes('already exists') || lowerMessage.includes('already registered')) {
+            return 'This email is already registered. Please use a different email.'
+          }
+          if (lowerMessage.includes('invalid') || lowerMessage.includes('format')) {
+            return 'Invalid email format. Please enter a valid email address.'
+          }
           return 'Invalid email format or email not found.'
         }
-        if (error.message?.toLowerCase().includes('already exists')) {
-          return error.message
+        if (lowerMessage.includes('venue') && lowerMessage.includes('booked')) {
+          return 'Venue is already booked for this time slot. Please choose a different time or venue.'
         }
-        return error.message || 'Invalid request. Please check your input.'
+        if (lowerMessage.includes('already exists') || lowerMessage.includes('duplicate')) {
+          return errorMessage || 'This item already exists.'
+        }
+        if (lowerMessage.includes('required')) {
+          return 'Please fill in all required fields.'
+        }
+        if (lowerMessage.includes('validation') || lowerMessage.includes('invalid')) {
+          return errorMessage || 'Invalid data provided. Please check your input.'
+        }
+        return errorMessage || 'Invalid request. Please check your input.'
         
       case 401:
-        if (error.message?.toLowerCase().includes('invalid credentials')) {
+        if (lowerMessage.includes('invalid credentials') || lowerMessage.includes('wrong password')) {
           return 'Wrong email or password. Please try again.'
         }
-        if (error.message?.toLowerCase().includes('token')) {
+        if (lowerMessage.includes('token') || lowerMessage.includes('expired') || lowerMessage.includes('unauthorized')) {
           return 'Your session has expired. Please login again.'
         }
         return 'Authentication failed. Please check your credentials.'
         
       case 403:
+        if (lowerMessage.includes('permission') || lowerMessage.includes('authorized')) {
+          return errorMessage || 'You do not have permission to perform this action.'
+        }
         return 'You do not have permission to perform this action.'
         
       case 404:
-        if (error.message?.toLowerCase().includes('user')) {
+        if (lowerMessage.includes('user')) {
           return 'User account not found. Please contact your administrator.'
         }
-        if (error.message?.toLowerCase().includes('course')) {
+        if (lowerMessage.includes('course')) {
           return 'Course not found. It may have been deleted.'
         }
-        if (error.message?.toLowerCase().includes('announcement')) {
+        if (lowerMessage.includes('announcement')) {
           return 'Announcement not found. It may have been deleted.'
         }
-        return error.message || 'The requested resource was not found.'
+        if (lowerMessage.includes('schedule')) {
+          return 'Schedule not found. It may have been deleted.'
+        }
+        if (lowerMessage.includes('venue')) {
+          return 'Venue not found. It may have been deleted.'
+        }
+        return errorMessage || 'The requested resource was not found.'
         
       case 409:
-        if (error.message?.toLowerCase().includes('conflict')) {
-          return error.message
+        if (lowerMessage.includes('conflict')) {
+          return errorMessage || 'A conflict occurred. Please refresh and try again.'
         }
-        if (error.message?.toLowerCase().includes('venue')) {
+        if (lowerMessage.includes('venue')) {
           return 'Venue scheduling conflict. Please choose a different time or venue.'
+        }
+        if (lowerMessage.includes('already exists')) {
+          return errorMessage || 'This item already exists.'
         }
         return 'A conflict occurred. Please refresh and try again.'
         
       case 422:
-        return 'Invalid data provided. Please check all fields and try again.'
+        return errorMessage || 'Invalid data provided. Please check all fields and try again.'
         
       case 429:
         return 'Too many attempts. Please wait a moment and try again.'
@@ -78,21 +126,21 @@ export const getErrorMessage = (error) => {
         return 'Server timeout. Please try again.'
         
       default:
-        return error.message || `An error occurred (Code: ${error.status})`
+        return errorMessage || `An error occurred (Code: ${error.status})`
     }
   }
   
   // Validation errors
-  if (error.message?.toLowerCase().includes('required')) {
+  if (lowerMessage.includes('required')) {
     return 'Please fill in all required fields.'
   }
   
-  if (error.message?.toLowerCase().includes('invalid')) {
-    return error.message
+  if (lowerMessage.includes('invalid')) {
+    return errorMessage || 'Invalid input provided.'
   }
   
   // Default to the error message if available
-  return error.message || 'An unexpected error occurred. Please try again.'
+  return errorMessage || 'An unexpected error occurred. Please try again.'
 }
 
 // Error severity levels

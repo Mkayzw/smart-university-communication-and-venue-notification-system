@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { View, Text, TouchableOpacity, Animated, Dimensions } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
 export const Toast = ({ 
   message, 
@@ -11,24 +9,25 @@ export const Toast = ({
   onClose,
   position = 'top'
 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const slideAnim = useRef(new Animated.Value(position === 'top' ? -100 : 100)).current
+  const [fadeAnim] = useState(new Animated.Value(0))
+  const [slideAnim] = useState(new Animated.Value(-100))
   
   useEffect(() => {
-    // Animate in
+    // Fade in animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
+      Animated.spring(slideAnim, {
         toValue: 0,
-        duration: 300,
+        tension: 50,
+        friction: 7,
         useNativeDriver: true,
       }),
     ]).start()
-    
+
     // Auto dismiss
     if (duration > 0) {
       const timer = setTimeout(() => {
@@ -37,7 +36,7 @@ export const Toast = ({
       
       return () => clearTimeout(timer)
     }
-  }, [])
+  }, [duration])
   
   const handleClose = () => {
     Animated.parallel([
@@ -47,7 +46,7 @@ export const Toast = ({
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: position === 'top' ? -100 : 100,
+        toValue: -100,
         duration: 200,
         useNativeDriver: true,
       }),
@@ -58,66 +57,76 @@ export const Toast = ({
   
   const typeStyles = {
     success: {
-      container: 'bg-green-50 border-green-200',
-      icon: '#10B981',
-      iconName: 'checkmark-circle',
-      text: 'text-green-800'
+      backgroundColor: '#D1FAE5',
+      borderColor: '#10B981',
+      iconColor: '#10B981',
+      textColor: '#065F46',
+      iconName: 'checkmark-circle'
     },
     error: {
-      container: 'bg-red-50 border-red-200',
-      icon: '#EF4444',
-      iconName: 'alert-circle',
-      text: 'text-red-800'
+      backgroundColor: '#FEE2E2',
+      borderColor: '#EF4444',
+      iconColor: '#EF4444',
+      textColor: '#991B1B',
+      iconName: 'alert-circle'
     },
     warning: {
-      container: 'bg-amber-50 border-amber-200',
-      icon: '#F59E0B',
-      iconName: 'warning',
-      text: 'text-amber-800'
+      backgroundColor: '#FEF3C7',
+      borderColor: '#F59E0B',
+      iconColor: '#F59E0B',
+      textColor: '#92400E',
+      iconName: 'warning'
     },
     info: {
-      container: 'bg-blue-50 border-blue-200',
-      icon: '#3B82F6',
-      iconName: 'information-circle',
-      text: 'text-blue-800'
+      backgroundColor: '#DBEAFE',
+      borderColor: '#3B82F6',
+      iconColor: '#3B82F6',
+      textColor: '#1E40AF',
+      iconName: 'information-circle'
     }
   }
   
   const styles = typeStyles[type] || typeStyles.info
   
+  const positionStyles = {
+    top: { top: 50 },
+    bottom: { bottom: 50 },
+    center: { top: '50%', marginTop: -30 }
+  }
+  
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: slideAnim }],
-        position: 'absolute',
-        top: position === 'top' ? 60 : undefined,
-        bottom: position === 'bottom' ? 30 : undefined,
-        left: 20,
-        right: 20,
-        zIndex: 9999,
-      }}
+      style={[
+        toastStyles.container,
+        {
+          backgroundColor: styles.backgroundColor,
+          borderColor: styles.borderColor,
+          ...positionStyles[position],
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }
+      ]}
     >
-      <View className={`flex-row items-center rounded-lg border p-4 shadow-lg ${styles.container}`}>
+      <View style={toastStyles.content}>
         <Ionicons 
           name={styles.iconName} 
           size={24} 
-          color={styles.icon}
-          style={{ marginRight: 12 }}
+          color={styles.iconColor}
+          style={toastStyles.icon}
         />
         
-        <Text className={`flex-1 text-sm font-medium ${styles.text}`}>
+        <Text style={[toastStyles.text, { color: styles.textColor }]}>
           {message}
         </Text>
         
         <TouchableOpacity
           onPress={handleClose}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={toastStyles.closeButton}
         >
           <Ionicons 
             name="close" 
-            size={20} 
-            color={styles.icon}
+            size={18} 
+            color={styles.iconColor}
           />
         </TouchableOpacity>
       </View>
@@ -125,12 +134,48 @@ export const Toast = ({
   )
 }
 
+const toastStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 9999,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  icon: {
+    marginRight: 12,
+  },
+  text: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  closeButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+})
+
 // Toast Manager Hook
 export const useToast = () => {
   const [toasts, setToasts] = useState([])
   
   const showToast = (message, type = 'info', duration = 5000) => {
-    const id = Date.now()
+    const id = Date.now() + Math.random()
     const newToast = { id, message, type, duration }
     setToasts(prev => [...prev, newToast])
     
@@ -143,26 +188,15 @@ export const useToast = () => {
   
   const ToastContainer = ({ position = 'top' }) => (
     <>
-      {toasts.map((toast, index) => (
-        <View
+      {toasts.map((toast) => (
+        <Toast
           key={toast.id}
-          style={{
-            position: 'absolute',
-            top: position === 'top' ? 60 + (index * 70) : undefined,
-            bottom: position === 'bottom' ? 30 + (index * 70) : undefined,
-            left: 0,
-            right: 0,
-            zIndex: 9999 - index,
-          }}
-        >
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            duration={toast.duration}
-            position={position}
-            onClose={() => removeToast(toast.id)}
-          />
-        </View>
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => removeToast(toast.id)}
+          position={position}
+        />
       ))}
     </>
   )
@@ -173,7 +207,6 @@ export const useToast = () => {
     showError: (message, duration) => showToast(message, 'error', duration),
     showWarning: (message, duration) => showToast(message, 'warning', duration),
     showInfo: (message, duration) => showToast(message, 'info', duration),
-    ToastContainer,
-    removeToast
+    ToastContainer
   }
 }
