@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { app, server, PORT } = require('./app');
+const { startCronJobs } = require('./utils/cronJobs');
 
 // Trust proxy headers in production (required for Render and other platforms)
 if (process.env.NODE_ENV === 'production') {
@@ -15,6 +16,9 @@ server.listen(PORT, () => {
   console.log(` API Docs: http://localhost:${PORT}/api-docs`);
   console.log(' Socket.IO: Enabled');
   console.log('=================================\n');
+  
+  // Start cron jobs for automated tasks
+  startCronJobs();
 });
 
 // Graceful shutdown handlers are already in app.js

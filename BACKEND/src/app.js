@@ -1365,6 +1365,29 @@ app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), a
 
 // ==================== VENUE ROUTES ====================
 
+// Import venue occupancy utilities
+const { 
+  getVenuesWithOccupancy, 
+  isVenueCurrentlyOccupied,
+  getVenueScheduleForToday 
+} = require('./utils/venueOccupancy');
+
+// Get venues with real-time occupancy status
+app.get('/api/venues/realtime', authenticate, async (req, res, next) => {
+  try {
+    const venues = await getVenuesWithOccupancy();
+    
+    res.status(200).json({
+      success: true,
+      data: venues,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching real-time venue status:', error);
+    next(error);
+  }
+});
+
 // Check available venues
 app.get('/api/venues/available', authenticate, async (req, res, next) => {
   try {
