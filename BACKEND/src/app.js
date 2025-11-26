@@ -312,6 +312,24 @@ app.put('/api/users/:id', authenticate, async (req, res, next) => {
   }
 });
 
+// Delete user (Admin only)
+app.delete('/api/users/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== COURSE ROUTES ====================
 
 // Get all courses
@@ -344,6 +362,139 @@ app.get('/api/courses', authenticate, async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: courses
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get my courses (Student: enrolled, Lecturer: teaching)
+app.get('/api/courses/my', authenticate, async (req, res, next) => {
+  try {
+    let courses = [];
+    
+    if (req.user.role === 'STUDENT') {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: req.user.id },
+        include: {
+          course: {
+            include: {
+              lecturer: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      });
+      courses = enrollments.map(e => e.course);
+    } else if (req.user.role === 'LECTURER') {
+      courses = await prisma.course.findMany({
+        where: { lecturerId: req.user.id },
+        include: {
+          lecturer: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          enrollments: {
+            include: {
+              student: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: courses
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get departments list
+app.get('/api/courses/departments', authenticate, async (req, res, next) => {
+  try {
+    const departments = await prisma.course.findMany({
+      select: { department: true },
+      distinct: ['department'],
+      where: {
+        department: {
+          not: null
+        }
+      }
+    });
+
+    const departmentList = departments.map(d => d.department).filter(Boolean);
+
+    res.status(200).json({
+      success: true,
+      data: departmentList
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get single course
+app.get('/api/courses/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const course = await prisma.course.findUnique({
+      where: { id },
+      include: {
+        lecturer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        enrollments: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                studentId: true
+              }
+            }
+          }
+        },
+        schedules: {
+          include: {
+            venue: true
+          }
+        }
+      }
+    });
+
+    if (!course) {
+      return next(new AppError('Course not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: course
     });
   } catch (error) {
     next(error);
@@ -434,6 +585,144 @@ app.post('/api/courses/:id/enroll', authenticate, authorize('STUDENT'), async (r
   }
 });
 
+// Drop/Unenroll from course (Student only)
+app.delete('/api/courses/:id/enroll', authenticate, authorize('STUDENT'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const enrollment = await prisma.enrollment.findFirst({
+      where: {
+        courseId: id,
+        studentId: req.user.id
+      }
+    });
+
+    if (!enrollment) {
+      return next(new AppError('Not enrolled in this course', 404));
+    }
+
+    await prisma.enrollment.delete({
+      where: { id: enrollment.id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Successfully unenrolled from course'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update course (Lecturer/Admin)
+app.put('/api/courses/:id', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, description, credits, department } = req.body;
+
+    // Check if lecturer owns the course or is admin
+    if (req.user.role === 'LECTURER') {
+      const course = await prisma.course.findUnique({
+        where: { id },
+        select: { lecturerId: true }
+      });
+
+      if (!course || course.lecturerId !== req.user.id) {
+        return next(new AppError('Not authorized to update this course', 403));
+      }
+    }
+
+    const updatedCourse = await prisma.course.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        credits,
+        department
+      },
+      include: {
+        lecturer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: updatedCourse
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete course (Admin only)
+app.delete('/api/courses/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.course.delete({
+      where: { id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Course deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get course students (Lecturer/Admin)
+app.get('/api/courses/:id/students', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if lecturer owns the course or is admin
+    if (req.user.role === 'LECTURER') {
+      const course = await prisma.course.findUnique({
+        where: { id },
+        select: { lecturerId: true }
+      });
+
+      if (!course || course.lecturerId !== req.user.id) {
+        return next(new AppError('Not authorized to view this course students', 403));
+      }
+    }
+
+    const enrollments = await prisma.enrollment.findMany({
+      where: { courseId: id },
+      include: {
+        student: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            studentId: true,
+            department: true
+          }
+        }
+      }
+    });
+
+    const students = enrollments.map(e => e.student);
+
+    res.status(200).json({
+      success: true,
+      data: students
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== ANNOUNCEMENT ROUTES ====================
 
 // Get all announcements
@@ -455,6 +744,9 @@ app.get('/api/announcements', authenticate, async (req, res, next) => {
             lastName: true,
             role: true
           }
+        },
+        _count: {
+          select: { comments: true }
         }
       },
       orderBy: {
@@ -465,6 +757,53 @@ app.get('/api/announcements', authenticate, async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: announcements
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get single announcement
+app.get('/api/announcements/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const announcement = await prisma.announcement.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        },
+        comments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!announcement) {
+      return next(new AppError('Announcement not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: announcement
     });
   } catch (error) {
     next(error);
@@ -546,7 +885,207 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
   }
 });
 
+// Update announcement (Author/Admin only)
+app.put('/api/announcements/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, content, category, priority, targetAudience } = req.body;
+
+    // Check if user owns the announcement or is admin
+    const announcement = await prisma.announcement.findUnique({
+      where: { id },
+      select: { authorId: true }
+    });
+
+    if (!announcement) {
+      return next(new AppError('Announcement not found', 404));
+    }
+
+    if (announcement.authorId !== req.user.id && req.user.role !== 'ADMIN') {
+      return next(new AppError('Not authorized to update this announcement', 403));
+    }
+
+    const updatedAnnouncement = await prisma.announcement.update({
+      where: { id },
+      data: {
+        title,
+        content,
+        category,
+        priority,
+        targetAudience
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitAnnouncementUpdate('updated', updatedAnnouncement);
+
+    res.status(200).json({
+      success: true,
+      data: updatedAnnouncement
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete announcement (Author/Admin only)
+app.delete('/api/announcements/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user owns the announcement or is admin
+    const announcement = await prisma.announcement.findUnique({
+      where: { id },
+      select: { authorId: true }
+    });
+
+    if (!announcement) {
+      return next(new AppError('Announcement not found', 404));
+    }
+
+    if (announcement.authorId !== req.user.id && req.user.role !== 'ADMIN') {
+      return next(new AppError('Not authorized to delete this announcement', 403));
+    }
+
+    await prisma.announcement.delete({
+      where: { id }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitAnnouncementUpdate('deleted', { id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Announcement deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Add comment to announcement
+app.post('/api/announcements/:id/comments', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    validateRequired(['content'], req.body);
+
+    const comment = await prisma.comment.create({
+      data: {
+        content,
+        userId: req.user.id,
+        announcementId: id
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      data: comment
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete comment (Author/Admin only)
+app.delete('/api/announcements/comments/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user owns the comment or is admin
+    const comment = await prisma.comment.findUnique({
+      where: { id },
+      select: { userId: true }
+    });
+
+    if (!comment) {
+      return next(new AppError('Comment not found', 404));
+    }
+
+    if (comment.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return next(new AppError('Not authorized to delete this comment', 403));
+    }
+
+    await prisma.comment.delete({
+      where: { id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Comment deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== SCHEDULE ROUTES ====================
+
+// Get my personal schedule
+app.get('/api/schedules/my-schedule', authenticate, async (req, res, next) => {
+  try {
+    const where = {};
+    
+    if (req.user.role === 'STUDENT') {
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: req.user.id },
+        select: { courseId: true }
+      });
+      where.courseId = { in: enrollments.map(e => e.courseId) };
+    } else if (req.user.role === 'LECTURER') {
+      where.course = { lecturerId: req.user.id };
+    }
+
+    const schedules = await prisma.schedule.findMany({
+      where,
+      include: {
+        course: {
+          include: {
+            lecturer: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        venue: true
+      },
+      orderBy: [
+        { dayOfWeek: 'asc' },
+        { startTime: 'asc' }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: schedules
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Get all schedules
 app.get('/api/schedules', authenticate, async (req, res, next) => {
@@ -666,7 +1205,185 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
   }
 });
 
+// Update schedule (Lecturer/Admin only)
+app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { venueId, dayOfWeek, startTime, endTime, type } = req.body;
+
+    // Check if lecturer owns the course or is admin
+    if (req.user.role === 'LECTURER') {
+      const schedule = await prisma.schedule.findUnique({
+        where: { id },
+        include: {
+          course: {
+            select: { lecturerId: true }
+          }
+        }
+      });
+
+      if (!schedule || schedule.course.lecturerId !== req.user.id) {
+        return next(new AppError('Not authorized to update this schedule', 403));
+      }
+    }
+
+    // Check for venue conflicts if venue is being changed
+    if (venueId) {
+      const conflictingSchedule = await prisma.schedule.findFirst({
+        where: {
+          id: { not: id },
+          venueId,
+          dayOfWeek,
+          OR: [
+            {
+              AND: [
+                { startTime: { lte: startTime } },
+                { endTime: { gt: startTime } }
+              ]
+            },
+            {
+              AND: [
+                { startTime: { lt: endTime } },
+                { endTime: { gte: endTime } }
+              ]
+            }
+          ]
+        }
+      });
+
+      if (conflictingSchedule) {
+        return next(new AppError('Venue is already booked for this time slot', 400));
+      }
+    }
+
+    const updatedSchedule = await prisma.schedule.update({
+      where: { id },
+      data: {
+        venueId,
+        dayOfWeek,
+        startTime,
+        endTime,
+        type
+      },
+      include: {
+        course: {
+          include: {
+            lecturer: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        },
+        venue: true
+      }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitScheduleUpdate('updated', updatedSchedule);
+
+    res.status(200).json({
+      success: true,
+      data: updatedSchedule
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete schedule (Lecturer/Admin only)
+app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if lecturer owns the course or is admin
+    if (req.user.role === 'LECTURER') {
+      const schedule = await prisma.schedule.findUnique({
+        where: { id },
+        include: {
+          course: {
+            select: { lecturerId: true }
+          }
+        }
+      });
+
+      if (!schedule || schedule.course.lecturerId !== req.user.id) {
+        return next(new AppError('Not authorized to delete this schedule', 403));
+      }
+    }
+
+    await prisma.schedule.delete({
+      where: { id }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitScheduleUpdate('deleted', { id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Schedule deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== VENUE ROUTES ====================
+
+// Check available venues
+app.get('/api/venues/available', authenticate, async (req, res, next) => {
+  try {
+    const { dayOfWeek, startTime, endTime } = req.query;
+
+    const where = { isAvailable: true };
+
+    // If time parameters are provided, check for conflicts
+    if (dayOfWeek && startTime && endTime) {
+      const conflictingSchedules = await prisma.schedule.findMany({
+        where: {
+          dayOfWeek,
+          OR: [
+            {
+              AND: [
+                { startTime: { lte: startTime } },
+                { endTime: { gt: startTime } }
+              ]
+            },
+            {
+              AND: [
+                { startTime: { lt: endTime } },
+                { endTime: { gte: endTime } }
+              ]
+            }
+          ]
+        },
+        select: { venueId: true }
+      });
+
+      const occupiedVenueIds = conflictingSchedules.map(s => s.venueId);
+      
+      if (occupiedVenueIds.length > 0) {
+        where.id = { notIn: occupiedVenueIds };
+      }
+    }
+
+    const venues = await prisma.venue.findMany({
+      where,
+      orderBy: [
+        { building: 'asc' },
+        { roomNumber: 'asc' }
+      ]
+    });
+
+    res.status(200).json({
+      success: true,
+      data: venues
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Get all venues
 app.get('/api/venues', authenticate, async (req, res, next) => {
@@ -706,6 +1423,44 @@ app.get('/api/venues', authenticate, async (req, res, next) => {
   }
 });
 
+// Get single venue
+app.get('/api/venues/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const venue = await prisma.venue.findUnique({
+      where: { id },
+      include: {
+        schedules: {
+          include: {
+            course: {
+              select: {
+                code: true,
+                name: true
+              }
+            }
+          },
+          orderBy: [
+            { dayOfWeek: 'asc' },
+            { startTime: 'asc' }
+          ]
+        }
+      }
+    });
+
+    if (!venue) {
+      return next(new AppError('Venue not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      data: venue
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Create venue (Admin only)
 app.post('/api/venues', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
@@ -737,6 +1492,36 @@ app.post('/api/venues', authenticate, authorize('ADMIN'), async (req, res, next)
   }
 });
 
+// Update venue (Admin only)
+app.put('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, building, roomNumber, capacity, type, facilities } = req.body;
+
+    const venue = await prisma.venue.update({
+      where: { id },
+      data: {
+        name,
+        building,
+        roomNumber,
+        capacity,
+        type,
+        facilities
+      }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitVenueUpdate('updated', venue);
+
+    res.status(200).json({
+      success: true,
+      data: venue
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Update venue availability
 app.patch('/api/venues/:id/availability', authenticate, authorize('ADMIN'), async (req, res, next) => {
   try {
@@ -754,6 +1539,27 @@ app.patch('/api/venues/:id/availability', authenticate, authorize('ADMIN'), asyn
     res.status(200).json({
       success: true,
       data: venue
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete venue (Admin only)
+app.delete('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.venue.delete({
+      where: { id }
+    });
+
+    // Emit socket event
+    req.socketUtils.emitVenueUpdate('deleted', { id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Venue deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -790,14 +1596,35 @@ app.patch('/api/notifications/:id/read', authenticate, async (req, res, next) =>
         userId: req.user.id 
       },
       data: { 
-        isRead: true,
-        readAt: new Date()
+        read: true
       }
     });
 
     res.status(200).json({
       success: true,
       data: notification
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Mark all notifications as read
+app.put('/api/notifications/read/all', authenticate, async (req, res, next) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { 
+        userId: req.user.id,
+        read: false
+      },
+      data: { 
+        read: true
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'All notifications marked as read'
     });
   } catch (error) {
     next(error);
@@ -870,7 +1697,7 @@ app.get('/api/dashboard/stats', authenticate, async (req, res, next) => {
         prisma.notification.count({ 
           where: { 
             userId: req.user.id,
-            isRead: false 
+            read: false 
           } 
         })
       ]);
