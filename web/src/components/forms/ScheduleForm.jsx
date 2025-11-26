@@ -104,12 +104,42 @@ const ScheduleForm = ({ schedule, courses = [], onSubmit, onCancel, isLoading })
     if (!formData.endTime) {
       newErrors.endTime = 'End time is required';
     }
-    if (formData.startTime && formData.endTime && formData.startTime >= formData.endTime) {
-      newErrors.endTime = 'End time must be after start time';
+    
+    // Validate time format (HH:MM)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (formData.startTime && !timeRegex.test(formData.startTime)) {
+      newErrors.startTime = 'Invalid time format. Use HH:MM (e.g., 09:00)';
     }
+    if (formData.endTime && !timeRegex.test(formData.endTime)) {
+      newErrors.endTime = 'Invalid time format. Use HH:MM (e.g., 11:00)';
+    }
+    
+    // Validate time range
+    if (formData.startTime && formData.endTime) {
+      if (formData.startTime >= formData.endTime) {
+        newErrors.endTime = 'End time must be after start time';
+      } else {
+        // Check duration (max 8 hours)
+        const [startHours, startMinutes] = formData.startTime.split(':').map(Number);
+        const [endHours, endMinutes] = formData.endTime.split(':').map(Number);
+        const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+        if (duration > 8 * 60) {
+          newErrors.endTime = 'Schedule duration cannot exceed 8 hours';
+        }
+      }
+    }
+    
+    // Validate semester format
     if (!formData.semester.trim()) {
       newErrors.semester = 'Semester is required';
+    } else {
+      // Basic validation: must contain a year
+      const semesterPattern = /\d{4}/;
+      if (!semesterPattern.test(formData.semester) || formData.semester.trim().length < 6) {
+        newErrors.semester = 'Invalid semester format. Example: "2024 Fall" or "2024 Semester 1"';
+      }
     }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

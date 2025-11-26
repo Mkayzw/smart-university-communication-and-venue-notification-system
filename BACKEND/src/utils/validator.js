@@ -49,6 +49,58 @@ const validateTimeFormat = (time) => {
   return timeRegex.test(time);
 };
 
+const validateTimeRange = (startTime, endTime) => {
+  if (!validateTimeFormat(startTime) || !validateTimeFormat(endTime)) {
+    return { valid: false, message: 'Invalid time format. Use HH:MM' };
+  }
+  
+  const [startHours, startMinutes] = startTime.split(':').map(Number);
+  const [endHours, endMinutes] = endTime.split(':').map(Number);
+  
+  const startTotal = startHours * 60 + startMinutes;
+  const endTotal = endHours * 60 + endMinutes;
+  
+  if (startTotal >= endTotal) {
+    return { valid: false, message: 'Start time must be before end time' };
+  }
+  
+  // Check if duration is reasonable (not more than 8 hours)
+  const duration = endTotal - startTotal;
+  if (duration > 8 * 60) {
+    return { valid: false, message: 'Schedule duration cannot exceed 8 hours' };
+  }
+  
+  return { valid: true };
+};
+
+const validateSemester = (semester) => {
+  if (!semester || typeof semester !== 'string') {
+    return false;
+  }
+  
+  // Basic validation: should contain year and semester identifier
+  // Examples: "2024 Fall", "2024-2025 Fall", "Fall 2024", "2024 Semester 1"
+  const semesterPattern = /\d{4}/; // Must contain a year
+  return semesterPattern.test(semester) && semester.trim().length >= 6;
+};
+
+// Check if two time intervals overlap
+const timeIntervalsOverlap = (start1, end1, start2, end2) => {
+  // Convert to minutes for comparison
+  const toMinutes = (time) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  const s1 = toMinutes(start1);
+  const e1 = toMinutes(end1);
+  const s2 = toMinutes(start2);
+  const e2 = toMinutes(end2);
+  
+  // Two intervals overlap if: start1 < end2 AND start2 < end1
+  return s1 < e2 && s2 < e1;
+};
+
 module.exports = {
   validateEmail,
   validatePassword,
@@ -57,6 +109,9 @@ module.exports = {
   validateTargetAudience,
   validateVenueStatus,
   validateDayOfWeek,
-  validateTimeFormat
+  validateTimeFormat,
+  validateTimeRange,
+  validateSemester,
+  timeIntervalsOverlap
 };
 

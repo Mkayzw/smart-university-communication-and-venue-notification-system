@@ -19,7 +19,11 @@ const {
   validateEmail,
   validatePassword,
   validateRequired,
-  validateRole
+  validateRole,
+  validateDayOfWeek,
+  validateTimeFormat,
+  validateTimeRange,
+  validateSemester
 } = require('./utils/validator');
 
 // Initialize express app
@@ -69,9 +73,16 @@ const authLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 
+// Validate required environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('ERROR: JWT_SECRET environment variable is required');
+  process.exit(1);
+}
+
 // JWT Token Generation
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'your-secret-key', {
+  return jwt.sign({ id }, JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   });
 };
@@ -89,7 +100,7 @@ const authenticate = async (req, res, next) => {
       return next(new AppError('Not authorized to access this route', 401));
     }
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, JWT_SECRET);
     
     req.user = await prisma.user.findUnique({
       where: { id: decoded.id },
@@ -1173,43 +1184,101 @@ app.get('/api/schedules', authenticate, async (req, res, next) => {
 // Create schedule (Lecturer/Admin only)
 app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
-    const { courseId, venueId, dayOfWeek, startTime, endTime, type } = req.body;
+    const { courseId, venueId, dayOfWeek, startTime, endTime, semester, type } = req.body;
 
-    validateRequired(['courseId', 'venueId', 'dayOfWeek', 'startTime', 'endTime'], req.body);
+    // Validate required fields
+    validateRequired(['courseId', 'venueId', 'dayOfWeek', 'startTime', 'endTime', 'semester'], req.body);
 
-    // Check for venue conflicts
+    // Validate day of week
+    if (!validateDayOfWeek(dayOfWeek)) {
+      return next(new AppError('Invalid day of week', 400));
+    }
+
+    // Validate time format and range
+    const timeValidation = validateTimeRange(startTime, endTime);
+    if (!timeValidation.valid) {
+      return next(new AppError(timeValidation.message, 400));
+    }
+
+    // Validate semester format
+    if (!validateSemester(semester)) {
+      return next(new AppError('Invalid semester format. Example: "2024 Fall" or "2024 Semester 1"', 400));
+    }
+
+    // Check if venue exists and is available
+    const venue = await prisma.venue.findUnique({
+      where: { id: venueId }
+    });
+
+    if (!venue) {
+      return next(new AppError('Venue not found', 404));
+    }
+
+    if (venue.status === 'MAINTENANCE') {
+      return next(new AppError('Venue is under maintenance and cannot be booked', 400));
+    }
+
+    // Check if course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        lecturer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!course) {
+      return next(new AppError('Course not found', 404));
+    }
+
+    // Validate lecturer assignment
+    if (req.user.role === 'LECTURER' && course.lecturerId !== req.user.id) {
+      return next(new AppError('You are not assigned as the lecturer for this course', 403));
+    }
+
+    // Check for venue conflicts - proper interval overlap detection
     const conflictingSchedule = await prisma.schedule.findFirst({
       where: {
         venueId,
         dayOfWeek,
-        OR: [
-          {
-            AND: [
-              { startTime: { lte: startTime } },
-              { endTime: { gt: startTime } }
-            ]
-          },
-          {
-            AND: [
-              { startTime: { lt: endTime } },
-              { endTime: { gte: endTime } }
-            ]
-          }
-        ]
+        semester, // Also check same semester
+        NOT: {
+          OR: [
+            // No overlap: new schedule ends before existing starts
+            { endTime: { lte: startTime } },
+            // No overlap: new schedule starts after existing ends
+            { startTime: { gte: endTime } }
+          ]
+        }
+      },
+      include: {
+        course: {
+          select: { code: true, name: true }
+        }
       }
     });
 
     if (conflictingSchedule) {
-      return next(new AppError('Venue is already booked for this time slot', 400));
+      return next(new AppError(
+        `Venue is already booked for this time slot. Conflict with: ${conflictingSchedule.course?.code || 'another course'}`,
+        400
+      ));
     }
 
     const schedule = await prisma.schedule.create({
       data: {
         courseId,
         venueId,
+        lecturerId: course.lecturerId,
         dayOfWeek,
         startTime,
         endTime,
+        semester,
         type: type || 'LECTURE'
       },
       include: {
@@ -1243,62 +1312,113 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
 app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { venueId, dayOfWeek, startTime, endTime, type } = req.body;
+    const { venueId, dayOfWeek, startTime, endTime, semester, type } = req.body;
 
-    // Check if lecturer owns the course or is admin
-    if (req.user.role === 'LECTURER') {
-      const schedule = await prisma.schedule.findUnique({
-        where: { id },
+    // Get existing schedule
+    const existingSchedule = await prisma.schedule.findUnique({
+      where: { id },
+      include: {
+        course: {
+          select: { lecturerId: true }
+        }
+      }
+    });
+
+    if (!existingSchedule) {
+      return next(new AppError('Schedule not found', 404));
+    }
+
+    // Check authorization
+    if (req.user.role === 'LECTURER' && existingSchedule.course.lecturerId !== req.user.id) {
+      return next(new AppError('Not authorized to update this schedule', 403));
+    }
+
+    // Prepare update data
+    const updateData = {};
+    const checkVenueId = venueId || existingSchedule.venueId;
+    const checkDay = dayOfWeek || existingSchedule.dayOfWeek;
+    const checkStart = startTime || existingSchedule.startTime;
+    const checkEnd = endTime || existingSchedule.endTime;
+    const checkSemester = semester || existingSchedule.semester;
+
+    // Validate day of week if provided
+    if (dayOfWeek && !validateDayOfWeek(dayOfWeek)) {
+      return next(new AppError('Invalid day of week', 400));
+    }
+
+    // Validate time format and range if times are provided
+    if (startTime || endTime) {
+      const finalStart = startTime || existingSchedule.startTime;
+      const finalEnd = endTime || existingSchedule.endTime;
+      const timeValidation = validateTimeRange(finalStart, finalEnd);
+      if (!timeValidation.valid) {
+        return next(new AppError(timeValidation.message, 400));
+      }
+      if (startTime) updateData.startTime = startTime;
+      if (endTime) updateData.endTime = endTime;
+    }
+
+    // Validate semester if provided
+    if (semester && !validateSemester(semester)) {
+      return next(new AppError('Invalid semester format. Example: "2024 Fall" or "2024 Semester 1"', 400));
+    }
+    if (semester) updateData.semester = semester;
+
+    // Check venue if being changed
+    if (venueId && venueId !== existingSchedule.venueId) {
+      const venue = await prisma.venue.findUnique({
+        where: { id: venueId }
+      });
+
+      if (!venue) {
+        return next(new AppError('Venue not found', 404));
+      }
+
+      if (venue.status === 'MAINTENANCE') {
+        return next(new AppError('Venue is under maintenance and cannot be booked', 400));
+      }
+      updateData.venueId = venueId;
+    }
+
+    // Update other fields
+    if (dayOfWeek) updateData.dayOfWeek = dayOfWeek;
+    if (type) updateData.type = type;
+
+    // Check for venue conflicts if any relevant field changed
+    if (venueId || dayOfWeek || startTime || endTime || semester) {
+      const conflictingSchedule = await prisma.schedule.findFirst({
+        where: {
+          id: { not: id },
+          venueId: checkVenueId,
+          dayOfWeek: checkDay,
+          semester: checkSemester,
+          NOT: {
+            OR: [
+              // No overlap: new schedule ends before existing starts
+              { endTime: { lte: checkStart } },
+              // No overlap: new schedule starts after existing ends
+              { startTime: { gte: checkEnd } }
+            ]
+          }
+        },
         include: {
           course: {
-            select: { lecturerId: true }
+            select: { code: true, name: true }
           }
         }
       });
 
-      if (!schedule || schedule.course.lecturerId !== req.user.id) {
-        return next(new AppError('Not authorized to update this schedule', 403));
-      }
-    }
-
-    // Check for venue conflicts if venue is being changed
-    if (venueId) {
-      const conflictingSchedule = await prisma.schedule.findFirst({
-        where: {
-          id: { not: id },
-          venueId,
-          dayOfWeek,
-          OR: [
-            {
-              AND: [
-                { startTime: { lte: startTime } },
-                { endTime: { gt: startTime } }
-              ]
-            },
-            {
-              AND: [
-                { startTime: { lt: endTime } },
-                { endTime: { gte: endTime } }
-              ]
-            }
-          ]
-        }
-      });
-
       if (conflictingSchedule) {
-        return next(new AppError('Venue is already booked for this time slot', 400));
+        return next(new AppError(
+          `Venue is already booked for this time slot. Conflict with: ${conflictingSchedule.course?.code || 'another course'}`,
+          400
+        ));
       }
     }
 
     const updatedSchedule = await prisma.schedule.update({
       where: { id },
-      data: {
-        venueId,
-        dayOfWeek,
-        startTime,
-        endTime,
-        type
-      },
+      data: updateData,
       include: {
         course: {
           include: {

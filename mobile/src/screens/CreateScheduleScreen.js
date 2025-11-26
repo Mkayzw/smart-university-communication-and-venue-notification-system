@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../utils/apiClient';
@@ -112,7 +112,69 @@ export const CreateScheduleScreen = ({ navigation }) => {
     });
   };
   
+  const validateForm = () => {
+    const errors = [];
+    
+    if (!courseValue) {
+      errors.push('Course is required');
+    }
+    if (!venueValue) {
+      errors.push('Venue is required');
+    }
+    if (!form.dayOfWeek) {
+      errors.push('Day of week is required');
+    }
+    if (!form.startTime) {
+      errors.push('Start time is required');
+    }
+    if (!form.endTime) {
+      errors.push('End time is required');
+    }
+    if (!form.semester || !form.semester.trim()) {
+      errors.push('Semester is required');
+    }
+    
+    // Validate time format
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (form.startTime && !timeRegex.test(form.startTime)) {
+      errors.push('Invalid start time format. Use HH:MM (e.g., 09:00)');
+    }
+    if (form.endTime && !timeRegex.test(form.endTime)) {
+      errors.push('Invalid end time format. Use HH:MM (e.g., 11:00)');
+    }
+    
+    // Validate time range
+    if (form.startTime && form.endTime) {
+      if (form.startTime >= form.endTime) {
+        errors.push('End time must be after start time');
+      } else {
+        const [startHours, startMinutes] = form.startTime.split(':').map(Number);
+        const [endHours, endMinutes] = form.endTime.split(':').map(Number);
+        const duration = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+        if (duration > 8 * 60) {
+          errors.push('Schedule duration cannot exceed 8 hours');
+        }
+      }
+    }
+    
+    // Validate semester format
+    if (form.semester && form.semester.trim()) {
+      const semesterPattern = /\d{4}/;
+      if (!semesterPattern.test(form.semester) || form.semester.trim().length < 6) {
+        errors.push('Invalid semester format. Example: "2024 Fall" or "2024 Semester 1"');
+      }
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = () => {
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      Alert.alert('Validation Error', validationErrors.join('\n'));
+      return;
+    }
+    
     const finalData = {
       ...form,
       courseId: courseValue,
