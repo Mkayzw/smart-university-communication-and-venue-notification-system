@@ -335,7 +335,15 @@ app.delete('/api/users/:id', authenticate, authorize('ADMIN'), async (req, res, 
 // Get all courses
 app.get('/api/courses', authenticate, async (req, res, next) => {
   try {
+    const { page = 1, limit = 12 } = req.query;
+    
+    // Add pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     const courses = await prisma.course.findMany({
+      skip,
+      take,
       include: {
         lecturer: {
           select: {
@@ -359,9 +367,18 @@ app.get('/api/courses', authenticate, async (req, res, next) => {
       }
     });
 
+    // Get total count for pagination
+    const total = await prisma.course.count();
+
     res.status(200).json({
       success: true,
-      data: courses
+      data: courses,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
     next(error);
@@ -1090,6 +1107,7 @@ app.get('/api/schedules/my-schedule', authenticate, async (req, res, next) => {
 // Get all schedules
 app.get('/api/schedules', authenticate, async (req, res, next) => {
   try {
+    const { page = 1, limit = 20 } = req.query;
     const where = {};
     
     // Students see only their enrolled courses' schedules
@@ -1106,8 +1124,14 @@ app.get('/api/schedules', authenticate, async (req, res, next) => {
       where.course = { lecturerId: req.user.id };
     }
 
+    // Add pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     const schedules = await prisma.schedule.findMany({
       where,
+      skip,
+      take,
       include: {
         course: {
           include: {
@@ -1127,11 +1151,21 @@ app.get('/api/schedules', authenticate, async (req, res, next) => {
       ]
     });
 
+    // Get total count for pagination
+    const total = await prisma.schedule.count({ where });
+
     res.status(200).json({
       success: true,
-      data: schedules
+      data: schedules,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
+    console.error('Error fetching schedules:', error);
     next(error);
   }
 });
@@ -1388,14 +1422,20 @@ app.get('/api/venues/available', authenticate, async (req, res, next) => {
 // Get all venues
 app.get('/api/venues', authenticate, async (req, res, next) => {
   try {
-    const { available, building } = req.query;
+    const { available, building, page = 1, limit = 20 } = req.query;
     
     const where = {};
     if (building) where.building = building;
     if (available !== undefined) where.isAvailable = available === 'true';
 
+    // Add pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
     const venues = await prisma.venue.findMany({
       where,
+      skip,
+      take,
       include: {
         schedules: {
           include: {
@@ -1414,11 +1454,21 @@ app.get('/api/venues', authenticate, async (req, res, next) => {
       ]
     });
 
+    // Get total count for pagination
+    const total = await prisma.venue.count({ where });
+
     res.status(200).json({
       success: true,
-      data: venues
+      data: venues,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
+    console.error('Error fetching venues:', error);
     next(error);
   }
 });

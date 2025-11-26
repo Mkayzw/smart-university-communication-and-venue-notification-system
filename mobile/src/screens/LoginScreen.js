@@ -10,30 +10,79 @@ import {
   ScrollView
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
+import { getErrorMessage, getFieldError } from '../utils/errorHandler'
+import { ErrorAlert } from '../components/ErrorAlert'
 
 export const LoginScreen = () => {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async () => {
-    if (!email || !password) {
-      setError('Please enter email and password')
+    // Client-side validation
+    const newFieldErrors = {}
+    
+    if (!email) {
+      newFieldErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newFieldErrors.email = 'Please enter a valid email address'
+    }
+    
+    if (!password) {
+      newFieldErrors.password = 'Password is required'
+    } else if (password.length < 8) {
+      newFieldErrors.password = 'Password must be at least 8 characters'
+    }
+    
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors)
       return
     }
 
     setError(null)
+    setFieldErrors({})
     setIsSubmitting(true)
+    
     try {
       await login({ email, password })
     } catch (err) {
-      setError(err.message || 'Login failed')
+      // Check for field-specific errors
+      const emailError = getFieldError(err, 'email')
+      const passwordError = getFieldError(err, 'password')
+      
+      if (emailError || passwordError) {
+        setFieldErrors({
+          email: emailError,
+          password: passwordError
+        })
+      } else {
+        // Use the enhanced error message handler
+        setError(getErrorMessage(err))
+      }
     } finally {
       setIsSubmitting(false)
     }
+  }
+  
+  const handleEmailChange = (text) => {
+    setEmail(text)
+    if (fieldErrors.email) {
+      setFieldErrors(prev => ({ ...prev, email: null }))
+    }
+    if (error) setError(null)
+  }
+  
+  const handlePasswordChange = (text) => {
+    setPassword(text)
+    if (fieldErrors.password) {
+      setFieldErrors(prev => ({ ...prev, password: null }))
+    }
+    if (error) setError(null)
   }
 
   return (
@@ -62,35 +111,57 @@ export const LoginScreen = () => {
             <View className="gap-5">
               <View className="gap-2">
                 <Text className="text-sm font-semibold text-slate-700">Email</Text>
-                <TextInput
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
-                  placeholder="name@university.edu"
-                  placeholderTextColor="#94a3b8"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  value={email}
-                  onChangeText={setEmail}
-                  editable={!isSubmitting}
-                />
+                <View>
+                  <TextInput
+                    className={`w-full rounded-xl border ${fieldErrors.email ? 'border-red-400' : 'border-slate-300'} bg-white px-4 py-3 text-base text-slate-900`}
+                    placeholder="name@university.edu"
+                    placeholderTextColor="#94a3b8"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    value={email}
+                    onChangeText={handleEmailChange}
+                    editable={!isSubmitting}
+                  />
+                  {fieldErrors.email && (
+                    <View className="flex-row items-center gap-1 mt-1 px-1">
+                      <Ionicons name="alert-circle" size={12} color="#EF4444" />
+                      <Text className="text-xs text-red-600">{fieldErrors.email}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
               <View className="gap-2">
                 <Text className="text-sm font-semibold text-slate-700">Password</Text>
-                <TextInput
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
-                  placeholder="••••••••"
-                  placeholderTextColor="#94a3b8"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                  editable={!isSubmitting}
-                />
+                <View>
+                  <TextInput
+                    className={`w-full rounded-xl border ${fieldErrors.password ? 'border-red-400' : 'border-slate-300'} bg-white px-4 py-3 text-base text-slate-900`}
+                    placeholder="••••••••"
+                    placeholderTextColor="#94a3b8"
+                    secureTextEntry
+                    value={password}
+                    onChangeText={handlePasswordChange}
+                    editable={!isSubmitting}
+                  />
+                  {fieldErrors.password && (
+                    <View className="flex-row items-center gap-1 mt-1 px-1">
+                      <Ionicons name="alert-circle" size={12} color="#EF4444" />
+                      <Text className="text-xs text-red-600">{fieldErrors.password}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
               {error && (
-                <View className="rounded-xl border border-orange-400 bg-orange-100 px-4 py-3">
-                  <Text className="text-sm font-semibold text-orange-700">{error}</Text>
-                </View>
+                <ErrorAlert 
+                  error={{ message: error }}
+                  onDismiss={() => setError(null)}
+                  onAction={(action) => {
+                    if (action === 'retry') {
+                      handleSubmit()
+                    }
+                  }}
+                />
               )}
 
               <TouchableOpacity
