@@ -18,8 +18,6 @@ const socketHandler = require('./socket/socketHandler');
 const notificationService = require('./services/notificationService');
 const { createNotification, notifyCourseStudents } = notificationService;
 
-// Initialize notification service with prisma instance
-notificationService.setPrisma(prisma);
 const {
   validateEmail,
   validatePassword,
@@ -42,6 +40,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // Initialize Prisma Client
 const prisma = new PrismaClient();
+
+// Initialize notification service with prisma instance
+notificationService.setPrisma(prisma);
 
 // Initialize Expo SDK for push notifications
 const expo = new Expo();
