@@ -1,4 +1,9 @@
-const prisma = require('../config/db');
+// Prisma will be passed from app.js to avoid multiple instances
+let prisma;
+
+const setPrisma = (prismaInstance) => {
+  prisma = prismaInstance;
+};
 
 /**
  * Create notification(s) for user(s)
@@ -171,6 +176,7 @@ const markAllAsRead = async (userId) => {
 };
 
 module.exports = {
+  setPrisma,
   createNotification,
   notifyCourseStudents,
   getUserNotifications,

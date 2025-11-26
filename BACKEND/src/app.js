@@ -15,6 +15,11 @@ const { errorHandler, AppError } = require('./utils/errorHandler');
 const logger = require('./utils/logger');
 const swaggerDocument = require('./config/swagger.json');
 const socketHandler = require('./socket/socketHandler');
+const notificationService = require('./services/notificationService');
+const { createNotification, notifyCourseStudents } = notificationService;
+
+// Initialize notification service with prisma instance
+notificationService.setPrisma(prisma);
 const {
   validateEmail,
   validatePassword,
@@ -932,6 +937,41 @@ app.post('/api/announcements', authenticate, authorize('LECTURER', 'ADMIN'), asy
     // Emit socket event
     req.socketUtils.emitAnnouncementUpdate('created', announcement);
 
+    // Create database notifications for target audience
+    try {
+      await createNotification({
+        targetAudience: targetAudience || 'ALL',
+        type: 'NEW_ANNOUNCEMENT',
+        message: `New announcement: ${title}`,
+        link: `/announcements/${announcement.id}`,
+        excludeUserId: req.user.id
+      });
+
+      // Emit Socket.IO notifications based on target audience
+      if (targetAudience === 'STUDENTS') {
+        io.to('role:STUDENT').emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      } else if (targetAudience === 'LECTURERS') {
+        io.to('role:LECTURER').emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      } else {
+        io.emit('notification', {
+          type: 'NEW_ANNOUNCEMENT',
+          message: `New announcement: ${title}`,
+          link: `/announcements/${announcement.id}`
+        });
+      }
+    } catch (error) {
+      console.error('Error creating announcement notifications:', error);
+      // Don't fail the request if notification fails
+    }
+
     // Send push notifications
     if (priority === 'HIGH' || priority === 'URGENT') {
       const users = await prisma.user.findMany({
@@ -1362,6 +1402,33 @@ app.post('/api/schedules', authenticate, authorize('LECTURER', 'ADMIN'), async (
     // Emit socket event
     req.socketUtils.emitScheduleUpdate('created', schedule);
 
+    // Notify enrolled students about the new schedule
+    try {
+      await notifyCourseStudents({
+        courseId,
+        type: 'SCHEDULE_CREATED',
+        message: `New schedule added for ${schedule.course.name} on ${dayOfWeek} at ${startTime} in ${schedule.venue.name}`,
+        link: `/schedules/${schedule.id}`
+      });
+
+      // Emit Socket.IO notifications to affected users
+      const enrolledStudents = await prisma.enrollment.findMany({
+        where: { courseId },
+        select: { studentId: true }
+      });
+
+      enrolledStudents.forEach(enrollment => {
+        io.to(`user:${enrollment.studentId}`).emit('notification', {
+          type: 'SCHEDULE_CREATED',
+          message: `New schedule added for ${schedule.course.name} on ${dayOfWeek}`,
+          link: `/schedules/${schedule.id}`
+        });
+      });
+    } catch (error) {
+      console.error('Error sending schedule creation notifications:', error);
+      // Don't fail the request if notification fails
+    }
+
     res.status(201).json({
       success: true,
       data: schedule
@@ -1500,6 +1567,33 @@ app.put('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), asyn
     // Emit socket event
     req.socketUtils.emitScheduleUpdate('updated', updatedSchedule);
 
+    // Notify enrolled students about the schedule update
+    try {
+      await notifyCourseStudents({
+        courseId: updatedSchedule.course.id,
+        type: 'SCHEDULE_UPDATED',
+        message: `Schedule updated for ${updatedSchedule.course.name} on ${updatedSchedule.dayOfWeek} at ${updatedSchedule.startTime}`,
+        link: `/schedules/${id}`
+      });
+
+      // Emit Socket.IO notifications to affected users
+      const enrolledStudents = await prisma.enrollment.findMany({
+        where: { courseId: updatedSchedule.course.id },
+        select: { studentId: true }
+      });
+
+      enrolledStudents.forEach(enrollment => {
+        io.to(`user:${enrollment.studentId}`).emit('notification', {
+          type: 'SCHEDULE_UPDATED',
+          message: `Schedule updated for ${updatedSchedule.course.name}`,
+          link: `/schedules/${id}`
+        });
+      });
+    } catch (error) {
+      console.error('Error sending schedule update notifications:', error);
+      // Don't fail the request if notification fails
+    }
+
     res.status(200).json({
       success: true,
       data: updatedSchedule
@@ -1514,20 +1608,27 @@ app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), a
   try {
     const { id } = req.params;
 
-    // Check if lecturer owns the course or is admin
-    if (req.user.role === 'LECTURER') {
-      const schedule = await prisma.schedule.findUnique({
-        where: { id },
-        include: {
-          course: {
-            select: { lecturerId: true }
+    // Get schedule with course info before deletion
+    const schedule = await prisma.schedule.findUnique({
+      where: { id },
+      include: {
+        course: {
+          select: {
+            id: true,
+            name: true,
+            lecturerId: true
           }
         }
-      });
-
-      if (!schedule || schedule.course.lecturerId !== req.user.id) {
-        return next(new AppError('Not authorized to delete this schedule', 403));
       }
+    });
+
+    if (!schedule) {
+      return next(new AppError('Schedule not found', 404));
+    }
+
+    // Check if lecturer owns the course or is admin
+    if (req.user.role === 'LECTURER' && schedule.course.lecturerId !== req.user.id) {
+      return next(new AppError('Not authorized to delete this schedule', 403));
     }
 
     await prisma.schedule.delete({
@@ -1536,6 +1637,33 @@ app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), a
 
     // Emit socket event
     req.socketUtils.emitScheduleUpdate('deleted', { id });
+
+    // Notify enrolled students about the schedule deletion
+    try {
+      await notifyCourseStudents({
+        courseId: schedule.course.id,
+        type: 'SCHEDULE_DELETED',
+        message: `Schedule cancelled for ${schedule.course.name} on ${schedule.dayOfWeek} at ${schedule.startTime}`,
+        link: `/courses/${schedule.course.id}`
+      });
+
+      // Emit Socket.IO notifications to affected users
+      const enrolledStudents = await prisma.enrollment.findMany({
+        where: { courseId: schedule.course.id },
+        select: { studentId: true }
+      });
+
+      enrolledStudents.forEach(enrollment => {
+        io.to(`user:${enrollment.studentId}`).emit('notification', {
+          type: 'SCHEDULE_DELETED',
+          message: `Schedule cancelled for ${schedule.course.name}`,
+          link: `/courses/${schedule.course.id}`
+        });
+      });
+    } catch (error) {
+      console.error('Error sending schedule deletion notifications:', error);
+      // Don't fail the request if notification fails
+    }
 
     res.status(200).json({
       success: true,
@@ -1828,14 +1956,59 @@ app.delete('/api/venues/:id', authenticate, authorize('ADMIN'), async (req, res,
 // Get user notifications
 app.get('/api/notifications', authenticate, async (req, res, next) => {
   try {
-    const notifications = await prisma.notification.findMany({
-      where: { userId: req.user.id },
-      orderBy: { createdAt: 'desc' }
+    const { unreadOnly, type, page = 1, limit = 50 } = req.query;
+    
+    const where = { userId: req.user.id };
+    
+    if (unreadOnly === 'true') {
+      where.read = false;
+    }
+    
+    if (type) {
+      where.type = type;
+    }
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.notification.count({ where })
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: notifications,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get unread notification count
+app.get('/api/notifications/unread/count', authenticate, async (req, res, next) => {
+  try {
+    const count = await prisma.notification.count({
+      where: {
+        userId: req.user.id,
+        read: false
+      }
     });
 
     res.status(200).json({
       success: true,
-      data: notifications
+      data: { count }
     });
   } catch (error) {
     next(error);
@@ -1882,6 +2055,36 @@ app.put('/api/notifications/read/all', authenticate, async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'All notifications marked as read'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete notification
+app.delete('/api/notifications/:id', authenticate, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const notification = await prisma.notification.findUnique({
+      where: { id }
+    });
+
+    if (!notification) {
+      return next(new AppError('Notification not found', 404));
+    }
+
+    if (notification.userId !== req.user.id) {
+      return next(new AppError('Not authorized to delete this notification', 403));
+    }
+
+    await prisma.notification.delete({
+      where: { id }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification deleted successfully'
     });
   } catch (error) {
     next(error);

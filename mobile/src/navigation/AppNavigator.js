@@ -20,15 +20,28 @@ import { EditScheduleScreen } from '../screens/EditScheduleScreen';
 import { CreateAnnouncementScreen } from '../screens/CreateAnnouncementScreen';
 import { EditAnnouncementScreen } from '../screens/EditAnnouncementScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '../utils/apiClient';
+import { useAuth } from '../contexts/AuthContext';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // This is the main tab bar after logging in
 const MainTabs = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  
+  // Get unread notification count for badge
+  const { data: unreadCountData } = useQuery({
+    queryKey: ['unread-notifications-count'],
+    queryFn: () => apiFetch('/notifications/unread/count', { token }),
+    enabled: !!token,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+  
+  const unreadCount = unreadCountData?.data?.count || 0;
 
   return (
     <Tab.Navigator
@@ -77,6 +90,24 @@ const MainTabs = () => {
         component={VenuesScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Feather name="map-pin" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <View style={styles.iconContainer}>
+              <Feather name="bell" size={size} color={color} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount.toString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tab.Screen
@@ -176,5 +207,28 @@ const AppNavigator = () => {
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+});
 
 export default AppNavigator;

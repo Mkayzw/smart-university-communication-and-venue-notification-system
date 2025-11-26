@@ -6,13 +6,12 @@ import { Link } from 'react-router-dom'
 export const Topbar = () => {
   const { user, logout } = useAuth()
 
-  // Fetch notifications to get unread count
-  const notificationsQuery = useApiQuery('/notifications', {
-    params: { limit: 100, page: 1 },
+  // Fetch unread notification count
+  const unreadCountQuery = useApiQuery('/notifications/unread/count', {
     refetchInterval: 30000 // Refetch every 30 seconds
   })
 
-  const unreadCount = notificationsQuery.data?.data?.filter(n => !n.read).length || 0
+  const unreadCount = unreadCountQuery.data?.data?.count || 0
 
   return (
     <header className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-white/80 p-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
