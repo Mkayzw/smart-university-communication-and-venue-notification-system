@@ -1793,10 +1793,8 @@ app.delete('/api/schedules/:id', authenticate, authorize('LECTURER', 'ADMIN'), a
 // ==================== VENUE ROUTES ====================
 
 // Import venue occupancy utilities
-const { 
-  getVenuesWithOccupancy, 
-  isVenueCurrentlyOccupied,
-  getVenueScheduleForToday 
+const {
+  getVenuesWithOccupancy
 } = require('./utils/venueOccupancy');
 
 // Get venues with real-time occupancy status
