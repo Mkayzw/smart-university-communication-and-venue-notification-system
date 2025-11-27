@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, server, PORT } = require('./app');
+const { app, server, PORT } = require('../app');
 const { startCronJobs } = require('./utils/cronJobs');
 const { Server } = require('socket.io');
 

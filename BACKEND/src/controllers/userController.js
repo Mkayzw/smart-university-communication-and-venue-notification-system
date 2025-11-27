@@ -1,7 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
-
-const prisma = new PrismaClient();
 
 // Get all users (Admin only)
 const getUsers = async (req, res, next) => {
@@ -33,7 +30,7 @@ const getUsers = async (req, res, next) => {
     }
 
     const [users, total] = await Promise.all([
-      prisma.user.findMany({
+      req.prisma.user.findMany({
         where,
         skip,
         take,
@@ -53,7 +50,7 @@ const getUsers = async (req, res, next) => {
           { firstName: 'asc' }
         ]
       }),
-      prisma.user.count({ where })
+      req.prisma.user.count({ where })
     ]);
 
     res.status(200).json({
@@ -82,7 +79,7 @@ const updateUser = async (req, res, next) => {
       return next(new AppError('Not authorized to update this profile', 403));
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await req.prisma.user.update({
       where: { id },
       data: {
         firstName,
@@ -115,7 +112,7 @@ const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    await prisma.user.delete({
+    await req.prisma.user.delete({
       where: { id }
     });
 

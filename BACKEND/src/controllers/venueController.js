@@ -1,11 +1,8 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
 const { validateRequired } = require('../utils/validator');
 const {
   getVenuesWithOccupancy
 } = require('../utils/venueOccupancy');
-
-const prisma = new PrismaClient();
 
 // Get venues with real-time occupancy status
 const getVenuesRealtime = async (req, res, next) => {
@@ -32,7 +29,7 @@ const getAvailableVenues = async (req, res, next) => {
 
     // If time parameters are provided, check for conflicts
     if (dayOfWeek && startTime && endTime) {
-      const conflictingSchedules = await prisma.schedule.findMany({
+      const conflictingSchedules = await req.prisma.schedule.findMany({
         where: {
           dayOfWeek,
           OR: [
@@ -60,7 +57,7 @@ const getAvailableVenues = async (req, res, next) => {
       }
     }
 
-    const venues = await prisma.venue.findMany({
+    const venues = await req.prisma.venue.findMany({
       where,
       orderBy: [
         { building: 'asc' },
@@ -90,7 +87,7 @@ const getVenues = async (req, res, next) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    const venues = await prisma.venue.findMany({
+    const venues = await req.prisma.venue.findMany({
       where,
       skip,
       take,
@@ -113,7 +110,7 @@ const getVenues = async (req, res, next) => {
     });
 
     // Get total count for pagination
-    const total = await prisma.venue.count({ where });
+    const total = await req.prisma.venue.count({ where });
 
     res.status(200).json({
       success: true,
@@ -136,7 +133,7 @@ const getVenue = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const venue = await prisma.venue.findUnique({
+    const venue = await req.prisma.venue.findUnique({
       where: { id },
       include: {
         schedules: {
@@ -176,7 +173,7 @@ const createVenue = async (req, res, next) => {
 
     validateRequired(['name', 'building', 'capacity'], req.body);
 
-    const venue = await prisma.venue.create({
+    const venue = await req.prisma.venue.create({
       data: {
         name,
         building,
@@ -204,7 +201,7 @@ const updateVenue = async (req, res, next) => {
     const { id } = req.params;
     const { name, building, capacity, facilities } = req.body;
 
-    const venue = await prisma.venue.update({
+    const venue = await req.prisma.venue.update({
       where: { id },
       data: {
         name,
@@ -237,7 +234,7 @@ const updateVenueAvailability = async (req, res, next) => {
       return next(new AppError('Invalid status. Must be AVAILABLE, OCCUPIED, or MAINTENANCE', 400));
     }
 
-    const venue = await prisma.venue.update({
+    const venue = await req.prisma.venue.update({
       where: { id },
       data: { status }
     });
@@ -259,7 +256,7 @@ const deleteVenue = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    await prisma.venue.delete({
+    await req.prisma.venue.delete({
       where: { id }
     });
 

@@ -1,5 +1,4 @@
 const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
 
 // Get dashboard stats
 const getDashboardStats = async (req, res, next) => {
@@ -8,10 +7,10 @@ const getDashboardStats = async (req, res, next) => {
 
     if (req.user.role === 'ADMIN') {
       const [totalUsers, totalCourses, totalVenues, activeSchedules] = await Promise.all([
-        prisma.user.count(),
-        prisma.course.count(),
-        prisma.venue.count(),
-        prisma.schedule.count()
+        req.prisma.user.count(),
+        req.prisma.course.count(),
+        req.prisma.venue.count(),
+        req.prisma.schedule.count()
       ]);
 
       stats.totalUsers = totalUsers;
@@ -20,9 +19,9 @@ const getDashboardStats = async (req, res, next) => {
       stats.activeSchedules = activeSchedules;
     } else if (req.user.role === 'LECTURER') {
       const [myCourses, mySchedules, totalStudents] = await Promise.all([
-        prisma.course.count({ where: { lecturerId: req.user.id } }),
-        prisma.schedule.count({ where: { course: { lecturerId: req.user.id } } }),
-        prisma.enrollment.count({ where: { course: { lecturerId: req.user.id } } })
+        req.prisma.course.count({ where: { lecturerId: req.user.id } }),
+        req.prisma.schedule.count({ where: { course: { lecturerId: req.user.id } } }),
+        req.prisma.enrollment.count({ where: { course: { lecturerId: req.user.id } } })
       ]);
 
       stats.myCourses = myCourses;
@@ -30,21 +29,21 @@ const getDashboardStats = async (req, res, next) => {
       stats.totalStudents = totalStudents;
     } else if (req.user.role === 'STUDENT') {
       const [enrolledCourses, upcomingClasses, unreadNotifications] = await Promise.all([
-        prisma.enrollment.count({ where: { studentId: req.user.id } }),
-        prisma.schedule.count({ 
-          where: { 
-            course: { 
-              enrollments: { 
-                some: { studentId: req.user.id } 
-              } 
-            } 
-          } 
+        req.prisma.enrollment.count({ where: { studentId: req.user.id } }),
+        req.prisma.schedule.count({
+          where: {
+            course: {
+              enrollments: {
+                some: { studentId: req.user.id }
+              }
+            }
+          }
         }),
-        prisma.notification.count({ 
-          where: { 
+        req.prisma.notification.count({
+          where: {
             userId: req.user.id,
-            read: false 
-          } 
+            read: false
+          }
         })
       ]);
 

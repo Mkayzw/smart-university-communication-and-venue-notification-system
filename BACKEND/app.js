@@ -9,28 +9,28 @@ const rateLimit = require('express-rate-limit');
 const Expo = require('expo-server-sdk').Expo;
 
 // Import utilities
-const { errorHandler, AppError } = require('./utils/errorHandler');
-const logger = require('./utils/logger');
-const swaggerDocument = require('./config/swagger.json');
-const socketHandler = require('./socket/socketHandler');
-const notificationService = require('./services/notificationService');
+const { errorHandler, AppError } = require('./src/utils/errorHandler');
+const logger = require('./src/utils/logger');
+const swaggerDocument = require('./src/config/swagger.json');
+const socketHandler = require('./src/socket/socketHandler');
+const notificationService = require('./src/services/notificationService');
 const { createNotification, notifyCourseStudents } = notificationService;
 
 
 
 // Import routes
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const courseRoutes = require('./routes/courseRoutes');
-const announcementRoutes = require('./routes/announcementRoutes');
-const scheduleRoutes = require('./routes/scheduleRoutes');
-const venueRoutes = require('./routes/venueRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
+const authRoutes = require('./src/routes/authRoutes');
+const userRoutes = require('./src/routes/userRoutes');
+const courseRoutes = require('./src/routes/courseRoutes');
+const announcementRoutes = require('./src/routes/announcementRoutes');
+const scheduleRoutes = require('./src/routes/scheduleRoutes');
+const venueRoutes = require('./src/routes/venueRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
+const dashboardRoutes = require('./src/routes/dashboardRoutes');
 
 // Import middleware
-const { authenticate, authorize } = require('./middleware/auth');
-const { generateToken } = require('./controllers/authController');
+const { authenticate, authorize } = require('./src/middleware/auth');
+const { generateToken } = require('./src/controllers/authController');
 
 // Initialize express app
 const app = express();

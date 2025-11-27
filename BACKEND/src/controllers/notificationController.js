@@ -1,9 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
-const Expo = require('expo-server-sdk').Expo;
-
-const prisma = new PrismaClient();
-const expo = new Expo();
 
 // Get user notifications
 const getNotifications = async (req, res, next) => {
@@ -25,13 +20,13 @@ const getNotifications = async (req, res, next) => {
 
     // Get all notifications first
     const [allNotifications, total] = await Promise.all([
-      prisma.notification.findMany({
+      req.prisma.notification.findMany({
         where,
         skip,
         take,
         orderBy: { createdAt: 'desc' }
       }),
-      prisma.notification.count({ where })
+      req.prisma.notification.count({ where })
     ]);
 
     // Filter notifications based on course enrollment for students
@@ -39,7 +34,7 @@ const getNotifications = async (req, res, next) => {
     
     if (req.user.role === 'STUDENT') {
       // Get student's enrolled courses
-      const enrollments = await prisma.enrollment.findMany({
+      const enrollments = await req.prisma.enrollment.findMany({
         where: { studentId: req.user.id },
         select: { courseId: true }
       });
@@ -52,7 +47,7 @@ const getNotifications = async (req, res, next) => {
         return match ? match[1] : null;
       }).filter(Boolean);
       
-      const schedules = await prisma.schedule.findMany({
+      const schedules = await req.prisma.schedule.findMany({
         where: { id: { in: scheduleIds } },
         select: { id: true, courseId: true }
       });
@@ -123,7 +118,7 @@ const getNotifications = async (req, res, next) => {
 const getUnreadCount = async (req, res, next) => {
   try {
     // Get all unread notifications first
-    const allUnreadNotifications = await prisma.notification.findMany({
+    const allUnreadNotifications = await req.prisma.notification.findMany({
       where: {
         userId: req.user.id,
         read: false
@@ -135,7 +130,7 @@ const getUnreadCount = async (req, res, next) => {
     
     if (req.user.role === 'STUDENT') {
       // Get student's enrolled courses
-      const enrollments = await prisma.enrollment.findMany({
+      const enrollments = await req.prisma.enrollment.findMany({
         where: { studentId: req.user.id },
         select: { courseId: true }
       });
@@ -148,7 +143,7 @@ const getUnreadCount = async (req, res, next) => {
         return match ? match[1] : null;
       }).filter(Boolean);
       
-      const schedules = await prisma.schedule.findMany({
+      const schedules = await req.prisma.schedule.findMany({
         where: { id: { in: scheduleIds } },
         select: { id: true, courseId: true }
       });
@@ -236,12 +231,12 @@ const markAsRead = async (req, res, next) => {
 // Mark all notifications as read
 const markAllAsRead = async (req, res, next) => {
   try {
-    await prisma.notification.updateMany({
-      where: { 
+    await req.prisma.notification.updateMany({
+      where: {
         userId: req.user.id,
         read: false
       },
-      data: { 
+      data: {
         read: true
       }
     });
@@ -260,7 +255,7 @@ const deleteNotification = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const notification = await prisma.notification.findUnique({
+    const notification = await req.prisma.notification.findUnique({
       where: { id }
     });
 
@@ -290,11 +285,11 @@ const registerPushToken = async (req, res, next) => {
   try {
     const { pushToken } = req.body;
 
-    if (!Expo.isExpoPushToken(pushToken)) {
+    if (!req.expo.isExpoPushToken(pushToken)) {
       return next(new AppError('Invalid push token', 400));
     }
 
-    await prisma.user.update({
+    await req.prisma.user.update({
       where: { id: req.user.id },
       data: { pushToken }
     });
@@ -321,7 +316,7 @@ const generateReminders = async (req, res, next) => {
     const currentDayOfWeek = now.getDay();
     
     // Get all schedules for the next few days
-    const upcomingSchedules = await prisma.schedule.findMany({
+    const upcomingSchedules = await req.prisma.schedule.findMany({
       include: {
         course: {
           include: {
@@ -398,7 +393,7 @@ const generateReminders = async (req, res, next) => {
           const student = enrollment.student;
           
           // Check if reminder already exists to avoid duplicates
-          const existingReminder = await prisma.notification.findFirst({
+          const existingReminder = await req.prisma.notification.findFirst({
             where: {
               userId: student.id,
               type: 'SCHEDULE_REMINDER',
@@ -411,7 +406,7 @@ const generateReminders = async (req, res, next) => {
           
           if (!existingReminder) {
             // Create database notification
-            await prisma.notification.create({
+            await req.prisma.notification.create({
               data: {
                 userId: student.id,
                 type: 'SCHEDULE_REMINDER',
@@ -433,7 +428,7 @@ const generateReminders = async (req, res, next) => {
             // Send push notification if student has a push token
             if (student.pushToken && Expo.isExpoPushToken(student.pushToken)) {
               try {
-                await expo.sendPushNotificationsAsync([{
+                await req.expo.sendPushNotificationsAsync([{
                   to: student.pushToken,
                   sound: 'default',
                   title: 'Class Reminder',

@@ -1,8 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
 const { validateRequired, validateDayOfWeek, validateTimeRange, validateSemester } = require('../utils/validator');
-
-const prisma = new PrismaClient();
 
 // Get my personal schedule
 const getMySchedule = async (req, res, next) => {
@@ -10,7 +7,7 @@ const getMySchedule = async (req, res, next) => {
     const where = {};
     
     if (req.user.role === 'STUDENT') {
-      const enrollments = await prisma.enrollment.findMany({
+      const enrollments = await req.prisma.enrollment.findMany({
         where: { studentId: req.user.id },
         select: { courseId: true }
       });
@@ -19,7 +16,7 @@ const getMySchedule = async (req, res, next) => {
       where.course = { lecturerId: req.user.id };
     }
 
-    const schedules = await prisma.schedule.findMany({
+    const schedules = await req.prisma.schedule.findMany({
       where,
       include: {
         course: {
@@ -72,7 +69,7 @@ const getSchedules = async (req, res, next) => {
     
     // Students see only their enrolled courses' schedules
     if (req.user.role === 'STUDENT') {
-      const enrollments = await prisma.enrollment.findMany({
+      const enrollments = await req.prisma.enrollment.findMany({
         where: { studentId: req.user.id },
         select: { courseId: true }
       });
@@ -95,7 +92,7 @@ const getSchedules = async (req, res, next) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    const schedules = await prisma.schedule.findMany({
+    const schedules = await req.prisma.schedule.findMany({
       where,
       skip,
       take,
@@ -119,7 +116,7 @@ const getSchedules = async (req, res, next) => {
     });
 
     // Get total count for pagination
-    const total = await prisma.schedule.count({ where });
+    const total = await req.prisma.schedule.count({ where });
 
     res.status(200).json({
       success: true,
@@ -162,7 +159,7 @@ const createSchedule = async (req, res, next) => {
     }
 
     // Check if venue exists and is available
-    const venue = await prisma.venue.findUnique({
+    const venue = await req.prisma.venue.findUnique({
       where: { id: venueId }
     });
 
@@ -175,7 +172,7 @@ const createSchedule = async (req, res, next) => {
     }
 
     // Check if course exists
-    const course = await prisma.course.findUnique({
+    const course = await req.prisma.course.findUnique({
       where: { id: courseId },
       include: {
         lecturer: {
@@ -198,7 +195,7 @@ const createSchedule = async (req, res, next) => {
     }
 
     // Check for venue conflicts - proper interval overlap detection
-    const conflictingSchedule = await prisma.schedule.findFirst({
+    const conflictingSchedule = await req.prisma.schedule.findFirst({
       where: {
         venueId,
         dayOfWeek,
@@ -226,7 +223,7 @@ const createSchedule = async (req, res, next) => {
       ));
     }
 
-    const schedule = await prisma.schedule.create({
+    const schedule = await req.prisma.schedule.create({
       data: {
         courseId,
         venueId,
@@ -257,14 +254,14 @@ const createSchedule = async (req, res, next) => {
     // Notify enrolled students about the new schedule
     try {
       // Get enrolled students for this course and create notifications directly
-      const enrolledStudents = await prisma.enrollment.findMany({
+      const enrolledStudents = await req.prisma.enrollment.findMany({
         where: { courseId },
         select: { studentId: true }
       });
 
       // Create notifications for each enrolled student
       await Promise.all(enrolledStudents.map(enrollment =>
-        prisma.notification.create({
+        req.prisma.notification.create({
           data: {
             userId: enrollment.studentId,
             type: 'SCHEDULE_CREATED',
@@ -276,7 +273,7 @@ const createSchedule = async (req, res, next) => {
 
       // Emit Socket.IO notifications to affected users
       const io = req.app.get('io');
-      const scheduleEnrolledStudents = await prisma.enrollment.findMany({
+      const scheduleEnrolledStudents = await req.prisma.enrollment.findMany({
         where: { courseId },
         select: { studentId: true }
       });
@@ -309,7 +306,7 @@ const updateSchedule = async (req, res, next) => {
     const { venueId, dayOfWeek, startTime, endTime, semester } = req.body;
 
     // Get existing schedule
-    const existingSchedule = await prisma.schedule.findUnique({
+    const existingSchedule = await req.prisma.schedule.findUnique({
       where: { id },
       include: {
         course: {
@@ -379,7 +376,7 @@ const updateSchedule = async (req, res, next) => {
 
     // Check for venue conflicts if any relevant field changed
     if (venueId || dayOfWeek || startTime || endTime || semester) {
-      const conflictingSchedule = await prisma.schedule.findFirst({
+      const conflictingSchedule = await req.prisma.schedule.findFirst({
         where: {
           id: { not: id },
           venueId: checkVenueId,
@@ -409,7 +406,7 @@ const updateSchedule = async (req, res, next) => {
       }
     }
 
-    const updatedSchedule = await prisma.schedule.update({
+    const updatedSchedule = await req.prisma.schedule.update({
       where: { id },
       data: updateData,
       include: {
@@ -433,14 +430,14 @@ const updateSchedule = async (req, res, next) => {
     // Notify enrolled students about the schedule update
     try {
       // Get enrolled students for this course and create notifications directly
-      const enrolledStudents = await prisma.enrollment.findMany({
+      const enrolledStudents = await req.prisma.enrollment.findMany({
         where: { courseId: updatedSchedule.course.id },
         select: { studentId: true }
       });
 
       // Create notifications for each enrolled student
       await Promise.all(enrolledStudents.map(enrollment =>
-        prisma.notification.create({
+        req.prisma.notification.create({
           data: {
             userId: enrollment.studentId,
             type: 'SCHEDULE_UPDATED',
@@ -479,7 +476,7 @@ const deleteSchedule = async (req, res, next) => {
     const { id } = req.params;
 
     // Get schedule with course info before deletion
-    const schedule = await prisma.schedule.findUnique({
+    const schedule = await req.prisma.schedule.findUnique({
       where: { id },
       include: {
         course: {
@@ -501,7 +498,7 @@ const deleteSchedule = async (req, res, next) => {
       return next(new AppError('Not authorized to delete this schedule', 403));
     }
 
-    await prisma.schedule.delete({
+    await req.prisma.schedule.delete({
       where: { id }
     });
 
@@ -511,14 +508,14 @@ const deleteSchedule = async (req, res, next) => {
     // Notify enrolled students about the schedule deletion
     try {
       // Get enrolled students for this course and create notifications directly
-      const enrolledStudents = await prisma.enrollment.findMany({
+      const enrolledStudents = await req.prisma.enrollment.findMany({
         where: { courseId: schedule.course.id },
         select: { studentId: true }
       });
 
       // Create notifications for each enrolled student
       await Promise.all(enrolledStudents.map(enrollment =>
-        prisma.notification.create({
+        req.prisma.notification.create({
           data: {
             userId: enrollment.studentId,
             type: 'SCHEDULE_DELETED',

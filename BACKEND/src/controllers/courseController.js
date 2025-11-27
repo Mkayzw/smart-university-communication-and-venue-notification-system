@@ -1,8 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
 const { validateRequired } = require('../utils/validator');
-
-const prisma = new PrismaClient();
 
 // Get all courses
 const getCourses = async (req, res, next) => {
@@ -32,7 +29,7 @@ const getCourses = async (req, res, next) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    const courses = await prisma.course.findMany({
+    const courses = await req.prisma.course.findMany({
       where,
       skip,
       take,
@@ -61,7 +58,7 @@ const getCourses = async (req, res, next) => {
     });
 
     // Get total count for pagination
-    const total = await prisma.course.count({ where });
+    const total = await req.prisma.course.count({ where });
 
     res.status(200).json({
       success: true,
@@ -84,7 +81,7 @@ const getMyCourses = async (req, res, next) => {
     let courses = [];
     
     if (req.user.role === 'STUDENT') {
-      const enrollments = await prisma.enrollment.findMany({
+      const enrollments = await req.prisma.enrollment.findMany({
         where: { studentId: req.user.id },
         include: {
           course: {
@@ -103,7 +100,7 @@ const getMyCourses = async (req, res, next) => {
       });
       courses = enrollments.map(e => e.course);
     } else if (req.user.role === 'LECTURER') {
-      courses = await prisma.course.findMany({
+      courses = await req.prisma.course.findMany({
         where: { lecturerId: req.user.id },
         include: {
           lecturer: {
@@ -141,7 +138,7 @@ const getMyCourses = async (req, res, next) => {
 // Get departments list
 const getDepartments = async (req, res, next) => {
   try {
-    const departments = await prisma.course.findMany({
+    const departments = await req.prisma.course.findMany({
       select: { department: true },
       distinct: ['department'],
       where: {
@@ -167,7 +164,7 @@ const getCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const course = await prisma.course.findUnique({
+    const course = await req.prisma.course.findUnique({
       where: { id },
       include: {
         lecturer: {
@@ -218,7 +215,7 @@ const createCourse = async (req, res, next) => {
 
     validateRequired(['code', 'name', 'credits', 'department'], req.body);
 
-    const course = await prisma.course.create({
+    const course = await req.prisma.course.create({
       data: {
         code,
         name,
@@ -257,7 +254,7 @@ const enrollInCourse = async (req, res, next) => {
     const { id } = req.params;
 
     // Check if already enrolled
-    const existingEnrollment = await prisma.enrollment.findFirst({
+    const existingEnrollment = await req.prisma.enrollment.findFirst({
       where: {
         courseId: id,
         studentId: req.user.id
@@ -268,7 +265,7 @@ const enrollInCourse = async (req, res, next) => {
       return next(new AppError('Already enrolled in this course', 400));
     }
 
-    const enrollment = await prisma.enrollment.create({
+    const enrollment = await req.prisma.enrollment.create({
       data: {
         courseId: id,
         studentId: req.user.id
@@ -312,7 +309,7 @@ const dropCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const enrollment = await prisma.enrollment.findFirst({
+    const enrollment = await req.prisma.enrollment.findFirst({
       where: {
         courseId: id,
         studentId: req.user.id
@@ -323,7 +320,7 @@ const dropCourse = async (req, res, next) => {
       return next(new AppError('Not enrolled in this course', 404));
     }
 
-    await prisma.enrollment.delete({
+    await req.prisma.enrollment.delete({
       where: { id: enrollment.id }
     });
 
@@ -357,7 +354,7 @@ const updateCourse = async (req, res, next) => {
 
     // Check if lecturer owns the course or is admin
     if (req.user.role === 'LECTURER') {
-      const course = await prisma.course.findUnique({
+      const course = await req.prisma.course.findUnique({
         where: { id },
         select: { lecturerId: true }
       });
@@ -367,7 +364,7 @@ const updateCourse = async (req, res, next) => {
       }
     }
 
-    const updatedCourse = await prisma.course.update({
+    const updatedCourse = await req.prisma.course.update({
       where: { id },
       data: {
         name,
@@ -401,7 +398,7 @@ const deleteCourse = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    await prisma.course.delete({
+    await req.prisma.course.delete({
       where: { id }
     });
 
@@ -421,7 +418,7 @@ const getCourseStudents = async (req, res, next) => {
 
     // Check if lecturer owns the course or is admin
     if (req.user.role === 'LECTURER') {
-      const course = await prisma.course.findUnique({
+      const course = await req.prisma.course.findUnique({
         where: { id },
         select: { lecturerId: true }
       });
@@ -431,7 +428,7 @@ const getCourseStudents = async (req, res, next) => {
       }
     }
 
-    const enrollments = await prisma.enrollment.findMany({
+    const enrollments = await req.prisma.enrollment.findMany({
       where: { courseId: id },
       include: {
         student: {

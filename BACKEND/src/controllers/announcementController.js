@@ -1,10 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
 const { validateRequired } = require('../utils/validator');
-const Expo = require('expo-server-sdk').Expo;
-
-const prisma = new PrismaClient();
-const expo = new Expo();
 
 // Get all announcements
 const getAnnouncements = async (req, res, next) => {
@@ -15,7 +10,7 @@ const getAnnouncements = async (req, res, next) => {
     if (targetAudience) where.targetAudience = targetAudience;
     if (pinned !== undefined) where.pinned = pinned === 'true';
 
-    const announcements = await prisma.announcement.findMany({
+    const announcements = await req.prisma.announcement.findMany({
       where,
       include: {
         author: {
@@ -49,7 +44,7 @@ const getAnnouncement = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const announcement = await prisma.announcement.findUnique({
+    const announcement = await req.prisma.announcement.findUnique({
       where: { id },
       include: {
         author: {
@@ -98,7 +93,7 @@ const createAnnouncement = async (req, res, next) => {
 
     validateRequired(['title', 'content'], req.body);
 
-    const announcement = await prisma.announcement.create({
+    const announcement = await req.prisma.announcement.create({
       data: {
         title,
         content,
@@ -125,14 +120,14 @@ const createAnnouncement = async (req, res, next) => {
     try {
       if (targetAudience === 'STUDENTS') {
         // Get all students
-        const students = await prisma.user.findMany({
+        const students = await req.prisma.user.findMany({
           where: { role: 'STUDENT' },
           select: { id: true }
         });
         
         // Create notifications for each student
         await Promise.all(students.map(student =>
-          prisma.notification.create({
+          req.prisma.notification.create({
             data: {
               userId: student.id,
               type: 'NEW_ANNOUNCEMENT',
@@ -143,14 +138,14 @@ const createAnnouncement = async (req, res, next) => {
         ));
       } else if (targetAudience === 'LECTURERS') {
         // Get all lecturers
-        const lecturers = await prisma.user.findMany({
+        const lecturers = await req.prisma.user.findMany({
           where: { role: 'LECTURER' },
           select: { id: true }
         });
         
         // Create notifications for each lecturer
         await Promise.all(lecturers.map(lecturer =>
-          prisma.notification.create({
+          req.prisma.notification.create({
             data: {
               userId: lecturer.id,
               type: 'NEW_ANNOUNCEMENT',
@@ -161,7 +156,7 @@ const createAnnouncement = async (req, res, next) => {
         ));
       } else {
         // ALL - get all users except author
-        const users = await prisma.user.findMany({
+        const users = await req.prisma.user.findMany({
           where: {
             id: { not: req.user.id }
           },
@@ -170,7 +165,7 @@ const createAnnouncement = async (req, res, next) => {
         
         // Create notifications for each user
         await Promise.all(users.map(user =>
-          prisma.notification.create({
+          req.prisma.notification.create({
             data: {
               userId: user.id,
               type: 'NEW_ANNOUNCEMENT',
@@ -209,7 +204,7 @@ const createAnnouncement = async (req, res, next) => {
 
     // Send push notifications for pinned announcements
     if (announcement.pinned) {
-      const users = await prisma.user.findMany({
+      const users = await req.prisma.user.findMany({
         where: {
           pushToken: {
             not: null
@@ -221,7 +216,7 @@ const createAnnouncement = async (req, res, next) => {
       });
 
       const messages = users
-        .filter(user => Expo.isExpoPushToken(user.pushToken))
+        .filter(user => req.expo.isExpoPushToken(user.pushToken))
         .map(user => ({
           to: user.pushToken,
           sound: 'default',
@@ -231,10 +226,10 @@ const createAnnouncement = async (req, res, next) => {
         }));
 
       if (messages.length > 0) {
-        const chunks = expo.chunkPushNotifications(messages);
+        const chunks = req.expo.chunkPushNotifications(messages);
         for (let chunk of chunks) {
           try {
-            await expo.sendPushNotificationsAsync(chunk);
+            await req.expo.sendPushNotificationsAsync(chunk);
           } catch (error) {
             console.error('Error sending push notifications:', error);
           }
@@ -258,7 +253,7 @@ const updateAnnouncement = async (req, res, next) => {
     const { title, content, targetAudience, pinned } = req.body;
 
     // Check if user owns the announcement or is admin
-    const announcement = await prisma.announcement.findUnique({
+    const announcement = await req.prisma.announcement.findUnique({
       where: { id },
       select: { authorId: true }
     });
@@ -277,7 +272,7 @@ const updateAnnouncement = async (req, res, next) => {
     if (targetAudience !== undefined) updateData.targetAudience = targetAudience;
     if (pinned !== undefined) updateData.pinned = pinned;
 
-    const updatedAnnouncement = await prisma.announcement.update({
+    const updatedAnnouncement = await req.prisma.announcement.update({
       where: { id },
       data: updateData,
       include: {
@@ -310,7 +305,7 @@ const deleteAnnouncement = async (req, res, next) => {
     const { id } = req.params;
 
     // Check if user owns the announcement or is admin
-    const announcement = await prisma.announcement.findUnique({
+    const announcement = await req.prisma.announcement.findUnique({
       where: { id },
       select: { authorId: true }
     });
@@ -323,7 +318,7 @@ const deleteAnnouncement = async (req, res, next) => {
       return next(new AppError('Not authorized to delete this announcement', 403));
     }
 
-    await prisma.announcement.delete({
+    await req.prisma.announcement.delete({
       where: { id }
     });
 
@@ -347,7 +342,7 @@ const addComment = async (req, res, next) => {
 
     validateRequired(['content'], req.body);
 
-    const comment = await prisma.comment.create({
+    const comment = await req.prisma.comment.create({
       data: {
         content,
         userId: req.user.id,
@@ -380,7 +375,7 @@ const deleteComment = async (req, res, next) => {
     const { id } = req.params;
 
     // Check if user owns the comment or is admin
-    const comment = await prisma.comment.findUnique({
+    const comment = await req.prisma.comment.findUnique({
       where: { id },
       select: { userId: true }
     });
@@ -393,7 +388,7 @@ const deleteComment = async (req, res, next) => {
       return next(new AppError('Not authorized to delete this comment', 403));
     }
 
-    await prisma.comment.delete({
+    await req.prisma.comment.delete({
       where: { id }
     });
 

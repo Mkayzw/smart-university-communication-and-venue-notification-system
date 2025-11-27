@@ -1,10 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const { AppError } = require('../utils/errorHandler');
 const { validateEmail, validatePassword, validateRole, validateRequired } = require('../utils/validator');
-
-const prisma = new PrismaClient();
 
 // JWT Token Generation
 const generateToken = (id) => {
@@ -32,7 +29,7 @@ const register = async (req, res, next) => {
       return next(new AppError('Invalid role. Must be STUDENT, LECTURER, or ADMIN', 400));
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await req.prisma.user.findUnique({
       where: { email }
     });
 
@@ -43,7 +40,7 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const user = await prisma.user.create({
+    const user = await req.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
@@ -86,7 +83,7 @@ const login = async (req, res, next) => {
 
     validateRequired(['email', 'password'], req.body);
 
-    const user = await prisma.user.findUnique({
+    const user = await req.prisma.user.findUnique({
       where: { email }
     });
 
