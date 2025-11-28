@@ -1,9 +1,17 @@
 const { AppError } = require('../utils/errorHandler');
-const { Expo } = require('expo-server-sdk');
+let Expo;
+
+try {
+  Expo = require('expo-server-sdk').Expo;
+} catch (error) {
+  console.error('Failed to load expo-server-sdk:', error);
+  Expo = null;
+}
 
 // Get user notifications
 const getNotifications = async (req, res, next) => {
   try {
+    console.log('Getting notifications for user:', req.user.id);
     const { unreadOnly, type, page = 1, limit = 50 } = req.query;
     
     const where = { userId: req.user.id };
@@ -30,75 +38,84 @@ const getNotifications = async (req, res, next) => {
       req.prisma.notification.count({ where })
     ]);
 
+    console.log(`Found ${allNotifications.length} notifications for user ${req.user.id}`);
+
     // Filter notifications based on course enrollment for students
     let filteredNotifications = allNotifications;
     
     if (req.user.role === 'STUDENT') {
-      // Get student's enrolled courses
-      const enrollments = await req.prisma.enrollment.findMany({
-        where: { studentId: req.user.id },
-        select: { courseId: true }
-      });
-      const enrolledCourseIds = enrollments.map(e => e.courseId);
+      try {
+        // Get student's enrolled courses
+        const enrollments = await req.prisma.enrollment.findMany({
+          where: { studentId: req.user.id },
+          select: { courseId: true }
+        });
+        const enrolledCourseIds = enrollments.map(e => e.courseId);
 
-      // Get all schedule notifications and their course IDs in one query
-      const scheduleNotifications = allNotifications.filter(n => n.link && n.link.includes('/schedules/'));
-      const scheduleIds = scheduleNotifications.map(n => {
-        const match = n.link.match(/\/schedules\/([^\/\?]+)/);
-        return match ? match[1] : null;
-      }).filter(Boolean);
-      
-      const schedules = await req.prisma.schedule.findMany({
-        where: { id: { in: scheduleIds } },
-        select: { id: true, courseId: true }
-      });
-      
-      const scheduleToCourseMap = Object.fromEntries(
-        schedules.map(s => [s.id, s.courseId])
-      );
-
-      // Filter notifications
-      filteredNotifications = allNotifications.filter(notification => {
-        // Allow non-course related notifications (announcements, system, etc.)
-        if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
-          return true;
-        }
+        // Get all schedule notifications and their course IDs in one query
+        const scheduleNotifications = allNotifications.filter(n => n.link && n.link.includes('/schedules/'));
+        const scheduleIds = scheduleNotifications.map(n => {
+          const match = n.link.match(/\/schedules\/([^\/\?]+)/);
+          return match ? match[1] : null;
+        }).filter(Boolean);
         
-        // Always allow announcement notifications
-        if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
-          return true;
-        }
-        
-        // For course-related notifications via /courses/ link
-        if (notification.link.includes('/courses/')) {
-          const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
-          if (courseIdMatch) {
-            const courseId = courseIdMatch[1];
-            return enrolledCourseIds.includes(courseId);
-          }
-        }
-        
-        // For schedule notifications via /schedules/ link - use pre-fetched map
-        if (notification.link.includes('/schedules/')) {
-          const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
-          if (scheduleIdMatch) {
-            const scheduleId = scheduleIdMatch[1];
-            const courseId = scheduleToCourseMap[scheduleId];
-            return courseId && enrolledCourseIds.includes(courseId);
-          }
-        }
-        
-        // Debug: Log any notifications that don't match patterns
-        console.log(`Notification filtering debug for user ${req.user.id}:`, {
-          type: notification.type,
-          link: notification.link,
-          message: notification.message,
-          allowed: false
+        const schedules = await req.prisma.schedule.findMany({
+          where: { id: { in: scheduleIds } },
+          select: { id: true, courseId: true }
         });
         
-        return false;
-      });
+        const scheduleToCourseMap = Object.fromEntries(
+          schedules.map(s => [s.id, s.courseId])
+        );
+
+        // Filter notifications
+        filteredNotifications = allNotifications.filter(notification => {
+          // Allow non-course related notifications (announcements, system, etc.)
+          if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
+            return true;
+          }
+          
+          // Always allow announcement notifications
+          if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
+            return true;
+          }
+          
+          // For course-related notifications via /courses/ link
+          if (notification.link.includes('/courses/')) {
+            const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
+            if (courseIdMatch) {
+              const courseId = courseIdMatch[1];
+              return enrolledCourseIds.includes(courseId);
+            }
+          }
+          
+          // For schedule notifications via /schedules/ link - use pre-fetched map
+          if (notification.link.includes('/schedules/')) {
+            const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
+            if (scheduleIdMatch) {
+              const scheduleId = scheduleIdMatch[1];
+              const courseId = scheduleToCourseMap[scheduleId];
+              return courseId && enrolledCourseIds.includes(courseId);
+            }
+          }
+          
+          // Debug: Log any notifications that don't match patterns
+          console.log(`Notification filtering debug for user ${req.user.id}:`, {
+            type: notification.type,
+            link: notification.link,
+            message: notification.message,
+            allowed: false
+          });
+          
+          return false;
+        });
+      } catch (filterError) {
+        console.error('Error filtering notifications for student:', filterError);
+        filteredNotifications = allNotifications; // Return all notifications if filtering fails
+      }
     }
+
+    console.log(`Returning ${filteredNotifications.length} filtered notifications for user ${req.user.id}`);
 
     res.status(200).json({
       success: true,
@@ -111,6 +128,7 @@ const getNotifications = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('Error in getNotifications:', error);
     next(error);
   }
 };
@@ -118,6 +136,7 @@ const getNotifications = async (req, res, next) => {
 // Get unread notification count
 const getUnreadCount = async (req, res, next) => {
   try {
+    console.log('Getting unread count for user:', req.user.id);
     // Get all unread notifications first
     const allUnreadNotifications = await req.prisma.notification.findMany({
       where: {
@@ -126,81 +145,91 @@ const getUnreadCount = async (req, res, next) => {
       }
     });
 
+    console.log(`Found ${allUnreadNotifications.length} unread notifications for user ${req.user.id}`);
+
     // Filter notifications based on course enrollment for students
     let filteredNotifications = allUnreadNotifications;
     
     if (req.user.role === 'STUDENT') {
-      // Get student's enrolled courses
-      const enrollments = await req.prisma.enrollment.findMany({
-        where: { studentId: req.user.id },
-        select: { courseId: true }
-      });
-      const enrolledCourseIds = enrollments.map(e => e.courseId);
+      try {
+        // Get student's enrolled courses
+        const enrollments = await req.prisma.enrollment.findMany({
+          where: { studentId: req.user.id },
+          select: { courseId: true }
+        });
+        const enrolledCourseIds = enrollments.map(e => e.courseId);
 
-      // Get all schedule notifications and their course IDs in one query
-      const scheduleNotifications = allUnreadNotifications.filter(n => n.link && n.link.includes('/schedules/'));
-      const scheduleIds = scheduleNotifications.map(n => {
-        const match = n.link.match(/\/schedules\/([^\/\?]+)/);
-        return match ? match[1] : null;
-      }).filter(Boolean);
-      
-      const schedules = await req.prisma.schedule.findMany({
-        where: { id: { in: scheduleIds } },
-        select: { id: true, courseId: true }
-      });
-      
-      const scheduleToCourseMap = Object.fromEntries(
-        schedules.map(s => [s.id, s.courseId])
-      );
-
-      // Filter notifications
-      filteredNotifications = allUnreadNotifications.filter(notification => {
-        // Allow non-course related notifications (announcements, system, etc.)
-        if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
-          return true;
-        }
+        // Get all schedule notifications and their course IDs in one query
+        const scheduleNotifications = allUnreadNotifications.filter(n => n.link && n.link.includes('/schedules/'));
+        const scheduleIds = scheduleNotifications.map(n => {
+          const match = n.link.match(/\/schedules\/([^\/\?]+)/);
+          return match ? match[1] : null;
+        }).filter(Boolean);
         
-        // Always allow announcement notifications
-        if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
-          return true;
-        }
-        
-        // For course-related notifications via /courses/ link
-        if (notification.link.includes('/courses/')) {
-          const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
-          if (courseIdMatch) {
-            const courseId = courseIdMatch[1];
-            return enrolledCourseIds.includes(courseId);
-          }
-        }
-        
-        // For schedule notifications via /schedules/ link - use pre-fetched map
-        if (notification.link.includes('/schedules/')) {
-          const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
-          if (scheduleIdMatch) {
-            const scheduleId = scheduleIdMatch[1];
-            const courseId = scheduleToCourseMap[scheduleId];
-            return courseId && enrolledCourseIds.includes(courseId);
-          }
-        }
-        
-        // Debug: Log any notifications that don't match patterns
-        console.log(`Unread notification filtering debug for user ${req.user.id}:`, {
-          type: notification.type,
-          link: notification.link,
-          message: notification.message,
-          allowed: false
+        const schedules = await req.prisma.schedule.findMany({
+          where: { id: { in: scheduleIds } },
+          select: { id: true, courseId: true }
         });
         
-        return false;
-      });
+        const scheduleToCourseMap = Object.fromEntries(
+          schedules.map(s => [s.id, s.courseId])
+        );
+
+        // Filter notifications
+        filteredNotifications = allUnreadNotifications.filter(notification => {
+          // Allow non-course related notifications (announcements, system, etc.)
+          if (!notification.link || (!notification.link.includes('/courses/') && !notification.link.includes('/schedules/') && !notification.link.includes('/announcements/'))) {
+            return true;
+          }
+          
+          // Always allow announcement notifications
+          if (notification.link.includes('/announcements/') || notification.type === 'NEW_ANNOUNCEMENT') {
+            return true;
+          }
+          
+          // For course-related notifications via /courses/ link
+          if (notification.link.includes('/courses/')) {
+            const courseIdMatch = notification.link.match(/\/courses\/([^\/\?]+)/);
+            if (courseIdMatch) {
+              const courseId = courseIdMatch[1];
+              return enrolledCourseIds.includes(courseId);
+            }
+          }
+          
+          // For schedule notifications via /schedules/ link - use pre-fetched map
+          if (notification.link.includes('/schedules/')) {
+            const scheduleIdMatch = notification.link.match(/\/schedules\/([^\/\?]+)/);
+            if (scheduleIdMatch) {
+              const scheduleId = scheduleIdMatch[1];
+              const courseId = scheduleToCourseMap[scheduleId];
+              return courseId && enrolledCourseIds.includes(courseId);
+            }
+          }
+          
+          // Debug: Log any notifications that don't match patterns
+          console.log(`Unread notification filtering debug for user ${req.user.id}:`, {
+            type: notification.type,
+            link: notification.link,
+            message: notification.message,
+            allowed: false
+          });
+          
+          return false;
+        });
+      } catch (filterError) {
+        console.error('Error filtering unread notifications for student:', filterError);
+        filteredNotifications = allUnreadNotifications; // Return all notifications if filtering fails
+      }
     }
+
+    console.log(`Returning ${filteredNotifications.length} unread notifications for user ${req.user.id}`);
 
     res.status(200).json({
       success: true,
       data: { count: filteredNotifications.length }
     });
   } catch (error) {
+    console.error('Error in getUnreadCount:', error);
     next(error);
   }
 };
@@ -285,6 +314,21 @@ const deleteNotification = async (req, res, next) => {
 const registerPushToken = async (req, res, next) => {
   try {
     const { pushToken } = req.body;
+
+    if (!Expo) {
+      console.warn('Expo SDK not available, skipping push token validation');
+      await req.prisma.user.update({
+        where: { id: req.user.id },
+        data: { pushToken }
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Push token registered successfully (without validation)'
+      });
+      return;
+    }
+
     const expo = new Expo();
 
     if (!Expo.isExpoPushToken(pushToken)) {
@@ -428,7 +472,7 @@ const generateReminders = async (req, res, next) => {
             });
             
             // Send push notification if student has a push token
-            if (student.pushToken) {
+            if (student.pushToken && Expo) {
               try {
                 const expo = new Expo();
                 
