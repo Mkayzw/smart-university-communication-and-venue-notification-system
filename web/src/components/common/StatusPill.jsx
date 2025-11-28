@@ -1,9 +1,11 @@
+// Color scheme definitions for different status tones
 const tones = {
   success: 'bg-brand-100 text-brand-700 border-brand-200',
   info: 'bg-slate-100 text-slate-600 border-slate-200',
   warning: 'bg-accent-100 text-accent-700 border-accent-200'
 }
 
+// Status pill component for displaying status indicators
 export const StatusPill = ({ tone = 'info', children }) => {
   return (
     <span

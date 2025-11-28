@@ -9,12 +9,11 @@ const rateLimit = require('express-rate-limit');
 const Expo = require('expo-server-sdk').Expo;
 
 // Import utilities
-const { errorHandler, AppError } = require('./src/utils/errorHandler');
+const { errorHandler } = require('./src/utils/errorHandler');
 const logger = require('./src/utils/logger');
 const swaggerDocument = require('./src/config/swagger.json');
 const socketHandler = require('./src/socket/socketHandler');
 const notificationService = require('./src/services/notificationService');
-const { createNotification, notifyCourseStudents } = notificationService;
 
 
 
@@ -28,9 +27,6 @@ const venueRoutes = require('./src/routes/venueRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
 
-// Import middleware
-const { authenticate, authorize } = require('./src/middleware/auth');
-const { generateToken } = require('./src/controllers/authController');
 
 // Initialize express app
 const app = express();
@@ -91,7 +87,7 @@ if (!JWT_SECRET) {
 }
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/announcements', announcementRoutes);

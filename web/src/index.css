@@ -1,5 +1,7 @@
+/* Import Tailwind CSS base styles */
 @import "tailwindcss";
 
+/* Define custom brand color palette */
 @theme {
   --color-brand-50: #f0fdf9;
   --color-brand-100: #ccfbef;
@@ -13,6 +15,7 @@
   --color-brand-900: #134e4a;
 }
 
+/* Base layer styles for root elements */
 @layer base {
   :root {
     color-scheme: light;
@@ -24,11 +27,13 @@
   body {
     margin: 0;
     min-height: 100vh;
+    /* Subtle gradient background with brand colors */
     background: radial-gradient(circle at 20% 20%, rgba(64, 170, 153, 0.15), transparent 55%),
       radial-gradient(circle at 80% 0%, rgba(255, 111, 29, 0.15), transparent 60%),
       #f5f7fb;
   }
 
+  /* Heading typography with custom font */
   h1,
   h2,
   h3,
@@ -39,6 +44,7 @@
     font-weight: 600;
   }
 
+  /* Custom scrollbar styling for all elements */
   * {
     scrollbar-width: thin;
     scrollbar-color: rgba(64, 170, 153, 0.7) transparent;
@@ -59,12 +65,15 @@
   }
 }
 
+/* Custom utility classes */
 @layer utilities {
+  /* Center content using CSS Grid */
   .center-grid {
     display: grid;
     place-items: center;
   }
 
+  /* Glass morphism effect for modern UI */
   .glass {
     background: rgba(255, 255, 255, 0.76);
     backdrop-filter: blur(18px);

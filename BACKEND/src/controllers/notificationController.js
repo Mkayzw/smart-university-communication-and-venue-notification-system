@@ -284,8 +284,10 @@ const deleteNotification = async (req, res, next) => {
 const registerPushToken = async (req, res, next) => {
   try {
     const { pushToken } = req.body;
+    const { Expo } = require('expo-server-sdk');
+    const expo = new Expo();
 
-    if (!req.expo.isExpoPushToken(pushToken)) {
+    if (!Expo.isExpoPushToken(pushToken)) {
       return next(new AppError('Invalid push token', 400));
     }
 
@@ -426,19 +428,24 @@ const generateReminders = async (req, res, next) => {
             });
             
             // Send push notification if student has a push token
-            if (student.pushToken && Expo.isExpoPushToken(student.pushToken)) {
+            if (student.pushToken) {
               try {
-                await req.expo.sendPushNotificationsAsync([{
-                  to: student.pushToken,
-                  sound: 'default',
-                  title: 'Class Reminder',
-                  body: `${schedule.course.name} class on ${schedule.dayOfWeek} at ${schedule.startTime} in ${schedule.venue.name}`,
-                  data: {
-                    type: 'SCHEDULE_REMINDER',
-                    scheduleId: schedule.id
-                  }
-                }]);
-                notificationsSent++;
+                const { Expo } = require('expo-server-sdk');
+                const expo = new Expo();
+                
+                if (Expo.isExpoPushToken(student.pushToken)) {
+                  await expo.sendPushNotificationsAsync([{
+                    to: student.pushToken,
+                    sound: 'default',
+                    title: 'Class Reminder',
+                    body: `${schedule.course.name} class on ${schedule.dayOfWeek} at ${schedule.startTime} in ${schedule.venue.name}`,
+                    data: {
+                      type: 'SCHEDULE_REMINDER',
+                      scheduleId: schedule.id
+                    }
+                  }]);
+                  notificationsSent++;
+                }
               } catch (pushError) {
                 console.error('Error sending push notification:', pushError);
               }

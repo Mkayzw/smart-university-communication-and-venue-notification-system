@@ -103,8 +103,7 @@ async function generateAutomatedReminders(hoursBefore = 24, daysAhead = 7) {
       const reminderTime = new Date(scheduleDate.getTime() - (hoursBefore * 60 * 60 * 1000));
       
       // Only create reminders if the reminder time is in the future and within the next hour
-      const oneHourFromNow = new Date(now.getTime() + (60 * 60 * 1000));
-      if (reminderTime > now && reminderTime <= oneHourFromNow) {
+      if (reminderTime > now) {
         // Create notifications for each enrolled student
         for (const enrollment of schedule.course.enrollments) {
           const student = enrollment.student;

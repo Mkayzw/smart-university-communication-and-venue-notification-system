@@ -1,15 +1,20 @@
+// Import React hooks for state management and memoization
 import { useState, useCallback } from 'react'
+// Import authentication hook for token access
 import { useAuth } from './useAuth'
+// Import API client for making HTTP requests
 import { apiFetch } from '../utils/apiClient'
-import { getErrorMessage } from '../utils/errorHandler'
+// Import error handling provider for user feedback
 import { useError } from '../providers/ErrorProvider'
 
+// Custom hook for API calls with built-in error handling and loading states
 export const useApiWithErrorHandling = () => {
   const { token } = useAuth()
   const { handleError, handleSuccess } = useError()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   
+  // Generic API call function with error handling
   const apiCall = useCallback(async (path, options = {}) => {
     setLoading(true)
     setError(null)
@@ -27,7 +32,6 @@ export const useApiWithErrorHandling = () => {
       
       return result
     } catch (err) {
-      const errorMessage = getErrorMessage(err)
       setError(err)
       
       // Handle error display based on options
@@ -50,6 +54,7 @@ export const useApiWithErrorHandling = () => {
     }
   }, [token, handleError, handleSuccess])
   
+  // HTTP method helpers
   const get = useCallback((path, options = {}) => {
     return apiCall(path, { ...options, method: 'GET' })
   }, [apiCall])

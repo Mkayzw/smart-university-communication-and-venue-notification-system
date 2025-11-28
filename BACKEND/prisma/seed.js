@@ -99,7 +99,8 @@ async function main() {
       lastName: 'Moyo',
       role: 'STUDENT',
       studentId: 'STU2025001',
-      department: 'Computer Science'
+      department: 'Computer Science',
+      pushToken: 'ExponentPushToken[AfXJ8k4e9LnP2qY1wS7tV6uW3cM5gI9b]'
     },
     {
       id: randomUUID(),
@@ -109,7 +110,8 @@ async function main() {
       lastName: 'Chimurenga',
       role: 'STUDENT',
       studentId: 'STU2025002',
-      department: 'Computer Science'
+      department: 'Computer Science',
+      pushToken: 'ExponentPushToken[BgYK9l5f0MoQ3rZ2xT8uW7vX4dN6hJ0c]'
     },
     {
       id: randomUUID(),
@@ -119,7 +121,8 @@ async function main() {
       lastName: 'Matsvai',
       role: 'STUDENT',
       studentId: 'STU2025003',
-      department: 'Electrical Engineering'
+      department: 'Electrical Engineering',
+      pushToken: 'ExponentPushToken[ChZL0m6g1NpR4sA3yU9vX8wY5eO7iK1d]'
     },
     {
       id: randomUUID(),
@@ -129,7 +132,8 @@ async function main() {
       lastName: 'Mutasa',
       role: 'STUDENT',
       studentId: 'STU2025004',
-      department: 'Business Administration'
+      department: 'Business Administration',
+      pushToken: 'ExponentPushToken[GvYK9l5d8QmN3pX2wR7sT6uV1bJ4fH8z]'
     },
     {
       id: randomUUID(),
@@ -139,7 +143,8 @@ async function main() {
       lastName: 'Makoni',
       role: 'STUDENT',
       studentId: 'STU2025005',
-      department: 'Business Administration'
+      department: 'Business Administration',
+      pushToken: 'ExponentPushToken[HwZL0m6e9RnO4qY3xS8tU7vW2cK5gI9a]'
     },
     {
       id: randomUUID(),
@@ -149,7 +154,8 @@ async function main() {
       lastName: 'Chikowore',
       role: 'STUDENT',
       studentId: 'STU2025006',
-      department: 'Creative Arts'
+      department: 'Creative Arts',
+      pushToken: 'ExponentPushToken[IxAM1n7f0SpP5rZ4yT9uV8wX3dL6hJ0b]'
     },
     {
       id: randomUUID(),
@@ -159,7 +165,8 @@ async function main() {
       lastName: 'Zvobgo',
       role: 'STUDENT',
       studentId: 'STU2025007',
-      department: 'Mathematics'
+      department: 'Mathematics',
+      pushToken: 'ExponentPushToken[JyBN2o8g1TqQ6sA5zU0wY9vX4eM7iK1c]'
     },
     {
       id: randomUUID(),
@@ -169,7 +176,8 @@ async function main() {
       lastName: 'Mushonga',
       role: 'STUDENT',
       studentId: 'STU2025008',
-      department: 'Electrical Engineering'
+      department: 'Electrical Engineering',
+      pushToken: 'ExponentPushToken[KzCO3p9h2UrR7tB6aV1xZ0wY5fN8jL2d]'
     },
     {
       id: randomUUID(),
@@ -179,7 +187,8 @@ async function main() {
       lastName: 'Ngwenya',
       role: 'STUDENT',
       studentId: 'STU2025009',
-      department: 'Computer Science'
+      department: 'Computer Science',
+      pushToken: 'ExponentPushToken[LaDP4q0i3VsS8uC7bY2aA1xZ6gO9kM3e]'
     },
     {
       id: randomUUID(),
@@ -189,7 +198,8 @@ async function main() {
       lastName: 'Mudzengerere',
       role: 'STUDENT',
       studentId: 'STU2025010',
-      department: 'Mathematics'
+      department: 'Mathematics',
+      pushToken: 'ExponentPushToken[MbEQ5r1j4WtT9vD8cZ3bB2yA7hP0lN4f]'
     },
     {
       id: randomUUID(),
@@ -199,7 +209,8 @@ async function main() {
       lastName: 'Gumbo',
       role: 'STUDENT',
       studentId: 'STU2025011',
-      department: 'Creative Arts'
+      department: 'Creative Arts',
+      pushToken: 'ExponentPushToken[NcFR6s2k5XuU0wE9dA4cC3zB8iQ1mO5g]'
     },
     {
       id: randomUUID(),
@@ -209,7 +220,8 @@ async function main() {
       lastName: 'Mutsvangwa',
       role: 'STUDENT',
       studentId: 'STU2025012',
-      department: 'Electrical Engineering'
+      department: 'Electrical Engineering',
+      pushToken: 'ExponentPushToken[OdGS7t3l6YvV1xF0eB5dD4cC9jR2nP6h]'
     },
     {
       id: randomUUID(),
@@ -219,7 +231,8 @@ async function main() {
       lastName: 'Matsinde',
       role: 'STUDENT',
       studentId: 'STU2025013',
-      department: 'Computer Science'
+      department: 'Computer Science',
+      pushToken: 'ExponentPushToken[PeHT8u4m7ZwW2yG1fC6eE5dD0kS3oQ7i]'
     },
     {
       id: randomUUID(),
@@ -229,7 +242,8 @@ async function main() {
       lastName: 'Chinamasa',
       role: 'STUDENT',
       studentId: 'STU2025014',
-      department: 'Mathematics'
+      department: 'Mathematics',
+      pushToken: 'ExponentPushToken[QfIU9v5n8AaX3zH2gD7fF6eE1lT4pR8j]'
     },
     {
       id: randomUUID(),
@@ -239,7 +253,8 @@ async function main() {
       lastName: 'Musarurwa',
       role: 'STUDENT',
       studentId: 'STU2025015',
-      department: 'Business Administration'
+      department: 'Business Administration',
+      pushToken: 'ExponentPushToken[RgJV0w6o9BbY4aI3hE8gG7fF2mU5qS9k]'
     }
   ];
 

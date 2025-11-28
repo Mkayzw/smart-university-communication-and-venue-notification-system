@@ -1,16 +1,23 @@
+// Import React hooks for state management and context
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+// Import API client for authentication requests
 import { apiFetch } from '../utils/apiClient.js'
+// Import socket utilities for real-time connections
 import { initializeSocket, disconnectSocket } from '../utils/socket.js'
 
+// Create authentication context
 const AuthContext = createContext(null)
 
+// Local storage key for persisting authentication
 const STORAGE_KEY = 'smart-uni-auth'
 
+// Authentication provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [status, setStatus] = useState('checking')
 
+  // Check for existing authentication on mount
   useEffect(() => {
     const cached = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
     if (!cached) {
@@ -44,6 +51,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
+  // Login function with token storage and socket initialization
   const login = useCallback(async ({ email, password }) => {
     setStatus('loading')
     const res = await apiFetch('/auth/login', {
@@ -70,6 +78,7 @@ export const AuthProvider = ({ children }) => {
     return nextUser
   }, [])
 
+  // Logout function with cleanup
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
@@ -80,6 +89,7 @@ export const AuthProvider = ({ children }) => {
     disconnectSocket()
   }, [])
 
+  // Memoize context value to prevent unnecessary re-renders
   const value = useMemo(
     () => ({
       user,
@@ -97,6 +107,7 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// Hook to access authentication context
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuthContext = () => {
   const ctx = useContext(AuthContext)

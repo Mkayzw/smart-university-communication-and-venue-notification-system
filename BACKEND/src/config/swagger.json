@@ -5,8 +5,8 @@
     "version": "1.0.0",
     "description": "A comprehensive backend system for university communication, announcements, venue management, and real-time notifications",
     "contact": {
-      "name": "University of Zimbabwe",
-      "email": "support@uz.ac.zw"
+      "name": "U of Z",
+      "email": "@BANGBR"
     }
   },
   "servers": [

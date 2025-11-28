@@ -1,7 +1,11 @@
+// Import React Query hooks for data fetching and caching
 import { useMutation, useQuery } from '@tanstack/react-query'
+// Import authentication hook for token access
 import { useAuth } from './useAuth.js'
+// Import API client for making HTTP requests
 import { apiFetch } from '../utils/apiClient.js'
 
+// Custom hook for GET requests using React Query
 export const useApiQuery = (path, options = {}) => {
   const { token, isAuthenticated } = useAuth()
 
@@ -31,16 +35,19 @@ export const useApiQuery = (path, options = {}) => {
   })
 }
 
+// Custom hook for POST/PUT/DELETE requests using React Query mutations
 export const useApiMutation = (path, options = {}) => {
   const { token } = useAuth()
 
   return useMutation({
     mutationKey: options.mutationKey ?? ['api', path],
     mutationFn: async (variables) => {
+      // Support dynamic path functions
       if (typeof path === 'function') {
         return path({ token, variables })
       }
 
+      // Build request configuration if custom function provided
       const config = typeof options.buildRequest === 'function' ? options.buildRequest(variables) : {}
 
       return apiFetch(path, {
