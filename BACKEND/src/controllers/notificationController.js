@@ -209,12 +209,12 @@ const markAsRead = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const notification = await prisma.notification.update({
-      where: { 
+    const notification = await req.prisma.notification.update({
+      where: {
         id,
-        userId: req.user.id 
+        userId: req.user.id
       },
-      data: { 
+      data: {
         read: true
       }
     });
@@ -267,7 +267,7 @@ const deleteNotification = async (req, res, next) => {
       return next(new AppError('Not authorized to delete this notification', 403));
     }
 
-    await prisma.notification.delete({
+    await req.prisma.notification.delete({
       where: { id }
     });
 
