@@ -1,4 +1,5 @@
 const { AppError } = require('../utils/errorHandler');
+const { Expo } = require('expo-server-sdk');
 
 // Get user notifications
 const getNotifications = async (req, res, next) => {
@@ -284,7 +285,6 @@ const deleteNotification = async (req, res, next) => {
 const registerPushToken = async (req, res, next) => {
   try {
     const { pushToken } = req.body;
-    const { Expo } = require('expo-server-sdk');
     const expo = new Expo();
 
     if (!Expo.isExpoPushToken(pushToken)) {
@@ -430,7 +430,6 @@ const generateReminders = async (req, res, next) => {
             // Send push notification if student has a push token
             if (student.pushToken) {
               try {
-                const { Expo } = require('expo-server-sdk');
                 const expo = new Expo();
                 
                 if (Expo.isExpoPushToken(student.pushToken)) {
