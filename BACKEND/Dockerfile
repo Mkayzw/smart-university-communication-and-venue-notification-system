@@ -2,6 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Prisma needs OpenSSL inside the Alpine container.
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 RUN npm ci
 
