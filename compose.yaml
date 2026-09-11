@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smart-university-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smart_university
+      POSTGRES_USER: smart_user
+      POSTGRES_PASSWORD: smart_password
+    volumes:
+      - smart_university_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smart_user -d smart_university"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./BACKEND
+      dockerfile: Dockerfile
+    container_name: smart-university-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://smart_user:smart_password@db:5432/smart_university"
+      JWT_SECRET: "smart-university-school-project-secret"
+      NODE_ENV: "production"
+      PORT: "3000"
+      FRONTEND_URL: "*"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3002:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: smart-university-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8086:80"
+
+volumes:
+  smart_university_postgres:
