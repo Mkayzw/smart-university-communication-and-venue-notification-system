@@ -5,7 +5,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 const swaggerUi = require('swagger-ui-express');
-const rateLimit = require('express-rate-limit');
 const Expo = require('expo-server-sdk').Expo;
 
 // Import utilities
@@ -72,13 +71,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(logger);
 
-// Rate limiting for auth routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-
 // Validate required environment variables
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -87,7 +79,7 @@ if (!JWT_SECRET) {
 }
 
 // API Routes
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/announcements', announcementRoutes);
