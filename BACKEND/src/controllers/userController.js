@@ -1,4 +1,5 @@
 const { AppError } = require('../utils/errorHandler');
+const { invalidateAuthUserCache } = require('../middleware/auth');
 
 // Get all users (Admin only)
 const getUsers = async (req, res, next) => {
@@ -10,15 +11,15 @@ const getUsers = async (req, res, next) => {
 
     // Build where clause
     const where = {};
-    
+
     if (role) {
       where.role = role;
     }
-    
+
     if (department) {
       where.department = department;
     }
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -98,6 +99,8 @@ const updateUser = async (req, res, next) => {
       }
     });
 
+    invalidateAuthUserCache(id);
+
     res.status(200).json({
       success: true,
       data: updatedUser
@@ -115,6 +118,8 @@ const deleteUser = async (req, res, next) => {
     await req.prisma.user.delete({
       where: { id }
     });
+
+    invalidateAuthUserCache(id);
 
     res.status(200).json({
       success: true,
